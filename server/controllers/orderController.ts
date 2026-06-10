@@ -1,6 +1,49 @@
 import { Request, Response } from "express";
+import Stripe from "stripe";
 import { prisma } from "../config/prisma.js";
 import { inngest } from "../inngest/index.js";
+
+const CARD_PAYMENT_METHOD = "card";
+const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
+
+const getRequestOrigin = (req: Request) =>
+  typeof req.headers.origin === "string" ? req.headers.origin : CLIENT_URL;
+
+const reduceStock = async (orderItems: { productId: string; quantity: number }[]) => {
+  for (const item of orderItems) {
+    await prisma.product.update({
+      where: {
+        id: item.productId,
+      },
+      data: {
+        stock: {
+          decrement: item.quantity,
+        },
+      },
+    });
+  }
+};
+
+const sendOrderEvents = async (
+  orderId: string,
+  orderItems: { productId: string; quantity: number }[],
+) => {
+  for (const item of orderItems) {
+    await inngest.send({
+      name: "inventory/stock.updated",
+      data: {
+        productId: item.productId,
+      },
+    });
+  }
+
+  await inngest.send({
+    name: "order/placed",
+    data: {
+      orderId,
+    },
+  });
+};
 
 // Create Order
 // Post/api/order
@@ -66,10 +109,16 @@ export const createOrder = async (req: Request, res: Response) => {
       0
     );
 
-    const deliveryFee = subtotal > 100 ? 0 : 1.99;
-    const tax = Math.round(subtotal * 0.07 * 100) / 100;
+    const deliveryFee = subtotal === 0 || subtotal >= 1500 ? 0 : 99;
+    const tax = Math.round(subtotal * 0.13);
     const total =
       Math.round((subtotal + deliveryFee + tax) * 100) / 100;
+
+    if (paymentMethod === CARD_PAYMENT_METHOD && !process.env.STRIPE_SECRET_KEY) {
+      return res.status(500).json({
+        message: "Stripe is not configured",
+      });
+    }
 
     const order = await prisma.order.create({
       data: {
@@ -92,37 +141,41 @@ export const createOrder = async (req: Request, res: Response) => {
       },
     });
 
-    // Reduce stock
-    for (const item of orderItems) {
-      await prisma.product.update({
-        where: {
-          id: item.productId,
-        },
-        data: {
-          stock: {
-            decrement: item.quantity,
+    if (paymentMethod === CARD_PAYMENT_METHOD) {
+      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+      const origin = getRequestOrigin(req);
+      const session = await stripe.checkout.sessions.create({
+        success_url: `${origin}/orders?clearCart=true`,
+        cancel_url: `${origin}/checkout`,
+        line_items: [
+          {
+            price_data: {
+              currency: "npr",
+              product_data: {
+                name: "QuickBasket groceries",
+              },
+              unit_amount: Math.round(total * 100),
+            },
+            quantity: 1,
           },
-        },
+        ],
+        mode: "payment",
+        metadata: { orderId: order.id },
       });
+
+      if (!session.url) {
+        return res.status(500).json({
+          message: "Could not create Stripe checkout session",
+        });
+      }
+
+      return res.status(201).json({ url: session.url });
     }
 
-    // Send stock update event for each product in the order 
+    await reduceStock(orderItems);
+    await sendOrderEvents(order.id, orderItems);
 
-    for(const item of orderItems) {
-      await inngest.send ({name: "inventory/stock.updated", data: {
-        productId: item.product
-      }})
-    }
-
-    await inngest.send({ name: "order/placed", data: {
-      orderId: order.id
-    }})
-
-
-
-
-
-    return res.status(201).json(order);
+    return res.status(201).json({ order });
   } catch (error) {
     console.error(error);
 

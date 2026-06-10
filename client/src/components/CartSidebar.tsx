@@ -76,7 +76,7 @@ const CartSidebar = () => {
             <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
               {cartItems.map(({ product, quantity }) => (
                 <div
-                  key={product._id}
+                  key={product.id}
                   className="flex gap-4 rounded-2xl border border-zinc-200 bg-white p-3"
                 >
                   <img
@@ -93,7 +93,7 @@ const CartSidebar = () => {
                       </div>
                       <button
                         type="button"
-                        onClick={() => removeFromCart(product._id)}
+                        onClick={() => removeFromCart(product.id)}
                         className="flex size-8 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-red-50 hover:text-red-500"
                         aria-label={`Remove ${product.name}`}
                       >
@@ -105,7 +105,7 @@ const CartSidebar = () => {
                       <div className="flex h-9 items-center rounded-full border border-zinc-200">
                         <button
                           type="button"
-                          onClick={() => updateCartQuantity(product._id, quantity - 1)}
+                          onClick={() => updateCartQuantity(product.id, quantity - 1)}
                           className="flex size-9 items-center justify-center rounded-full hover:bg-zinc-100"
                           aria-label={`Decrease ${product.name}`}
                         >
@@ -116,7 +116,7 @@ const CartSidebar = () => {
                         </span>
                         <button
                           type="button"
-                          onClick={() => updateCartQuantity(product._id, quantity + 1)}
+                          onClick={() => updateCartQuantity(product.id, quantity + 1)}
                           className="flex size-9 items-center justify-center rounded-full hover:bg-zinc-100"
                           aria-label={`Increase ${product.name}`}
                         >

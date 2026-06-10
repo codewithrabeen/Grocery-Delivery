@@ -35,7 +35,7 @@ const MyOrders = () => {
         ) : (
           <div className="space-y-5">
             {orders.map((order) => (
-              <article key={order._id} className="rounded-2xl bg-white p-5 shadow-sm">
+              <article key={order.id} className="rounded-2xl bg-white p-5 shadow-sm">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex gap-4">
                     <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-green-50 text-app-green">
@@ -43,7 +43,7 @@ const MyOrders = () => {
                     </span>
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-xl font-semibold text-zinc-950">{order._id}</h2>
+                        <h2 className="text-xl font-semibold text-zinc-950">{order.id}</h2>
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             statusColors[order.status] ?? "bg-zinc-100 text-zinc-600"
@@ -66,7 +66,7 @@ const MyOrders = () => {
                       {order.paymentMethod}
                     </p>
                     <Link
-                      to={`/orders/${order._id}`}
+                      to={`/orders/${order.id}`}
                       className="mt-4 inline-flex items-center gap-2 rounded-full bg-app-green px-4 py-2 text-sm font-semibold text-white hover:bg-app-green-light"
                     >
                       Track order
@@ -77,7 +77,7 @@ const MyOrders = () => {
 
                 <div className="mt-5 grid gap-3 border-t border-zinc-200 pt-5 sm:grid-cols-2 lg:grid-cols-4">
                   {order.items.slice(0, 4).map((item) => (
-                    <div key={`${order._id}-${item.product}`} className="flex items-center gap-3">
+                    <div key={`${order.id}-${item.product}`} className="flex items-center gap-3">
                       <img
                         src={item.image}
                         alt={item.name}

@@ -1,10 +1,14 @@
 import { Clock3Icon, FlameIcon, ShieldCheckIcon, TruckIcon } from "lucide-react";
 import ProductCard from "../components/ProductCard";
 import { useAppContext } from "../context/AppContext";
+import ErrorState from "../components/ui/ErrorState";
+import { ProductGridSkeleton } from "../components/ui/Skeleton";
 
 const FlashDeals = () => {
-  const { products } = useAppContext();
-  const deals = [...products].sort((a, b) => b.discount - a.discount);
+  const { productError, productLoading, products, refreshProducts } = useAppContext();
+  const deals = [...products]
+    .filter((product) => product.discount > 0 && product.stock > 0)
+    .sort((a, b) => b.discount - a.discount);
   const topDeals = deals.slice(0, 12);
 
   return (
@@ -44,15 +48,20 @@ const FlashDeals = () => {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {topDeals.map((product) => (
-            <ProductCard key={product._id} product={product} showCategory />
-          ))}
-        </div>
+        {productLoading ? (
+          <ProductGridSkeleton count={8} />
+        ) : productError ? (
+          <ErrorState message={productError} onRetry={() => void refreshProducts()} />
+        ) : (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {topDeals.map((product) => (
+              <ProductCard key={product.id} product={product} showCategory />
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );
 };
 
 export default FlashDeals;
-

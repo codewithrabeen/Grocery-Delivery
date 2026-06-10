@@ -1,24 +1,17 @@
 import {
-  BikeIcon,
-  CheckIcon,
-  ClockIcon,
-  MapPinIcon,
-  PackageCheckIcon,
   PhoneIcon,
   ReceiptTextIcon,
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { statusColors } from "../assets/assets";
+import OrderMap from "../components/OrderMap";
 import { useAppContext } from "../context/AppContext";
 import { formatDate, formatPrice } from "../lib/format";
-import OrderMap from "../components/OrderMap";
-
-const trackingSteps = ["Placed", "Confirmed", "Packed", "Out for Delivery", "Delivered"];
 
 const OrderTracking = () => {
   const { id } = useParams();
   const { orders } = useAppContext();
-  const order = orders.find((item) => item._id === id);
+  const order = orders.find((item) => item.id === id);
 
   if (!order) {
     return (
@@ -35,8 +28,6 @@ const OrderTracking = () => {
     );
   }
 
-  const currentStep = Math.max(0, trackingSteps.indexOf(order.status));
-
   return (
     <div className="min-h-screen bg-app-cream">
       <section className="border-b border-zinc-200 bg-white">
@@ -44,7 +35,7 @@ const OrderTracking = () => {
           <p className="text-sm font-semibold text-app-orange">Order tracking</p>
           <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h1 className="text-4xl font-bold text-zinc-950">{order._id}</h1>
+              <h1 className="text-4xl font-bold text-zinc-950">{order.id}</h1>
               <p className="mt-2 text-zinc-500">Placed on {formatDate(order.createdAt)}</p>
             </div>
             <span
@@ -60,32 +51,37 @@ const OrderTracking = () => {
 
       <section className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_380px] lg:px-8">
         <div className="space-y-6">
-          <section className="rounded-2xl bg-white p-6 shadow-sm">
-  <h2 className="text-2xl font-bold text-zinc-950">
-    Live Delivery Map
-  </h2>
+          <section className="rounded-lg bg-white p-6 shadow-sm">
+            <h2 className="text-2xl font-bold text-zinc-950">Live delivery map</h2>
+            <div className="mt-5">
+              <OrderMap address={order.shippingAddress.label} />
+            </div>
+          </section>
 
-  <div className="mt-5">
-    <OrderMap
-      address={order.shippingAddress.label}
-    />
-  </div>
-</section>
-
-
-  
+          <section className="rounded-lg bg-white p-6 shadow-sm">
+            <h2 className="text-2xl font-bold text-zinc-950">Status history</h2>
+            <div className="mt-5 space-y-4">
+              {order.statusHistory.map((item) => (
+                <div key={`${item.status}-${item.timestamp}`} className="border-l-2 border-app-green pl-4">
+                  <p className="font-semibold text-zinc-950">{item.status}</p>
+                  <p className="text-sm text-zinc-500">{formatDate(item.timestamp)}</p>
+                  {item.note && <p className="mt-1 text-sm text-zinc-600">{item.note}</p>}
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
 
         <aside className="space-y-6">
-          <section className="rounded-2xl bg-white p-6 shadow-sm">
+          <section className="rounded-lg bg-white p-6 shadow-sm">
             <h2 className="text-2xl font-bold text-zinc-950">Order details</h2>
             <div className="mt-5 space-y-4">
               {order.items.map((item) => (
-                <div key={item.product} className="flex gap-3">
+                <div key={item.product ?? item.productId ?? item.name} className="flex gap-3">
                   <img
                     src={item.image}
                     alt={item.name}
-                    className="size-14 rounded-xl bg-zinc-50 object-contain p-2"
+                    className="size-14 rounded-lg bg-zinc-50 object-contain p-2"
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-zinc-950">{item.name}</p>
@@ -120,9 +116,9 @@ const OrderTracking = () => {
             </div>
           </section>
 
-          <section className="rounded-2xl bg-white p-6 shadow-sm">
+          <section className="rounded-lg bg-white p-6 shadow-sm">
             <h2 className="flex items-center gap-2 text-2xl font-bold text-zinc-950">
-              <ReceiptTextIcon className="size-6 text-app-green" />
+              <ReceiptTextIcon className="size-6 text-app-green" aria-hidden="true" />
               Delivery info
             </h2>
             <div className="mt-5 space-y-4 text-sm text-zinc-600">
@@ -145,16 +141,18 @@ const OrderTracking = () => {
           </section>
 
           {order.deliveryPartner && (
-            <section className="rounded-2xl bg-app-green p-6 text-white shadow-sm">
+            <section className="rounded-lg bg-app-green p-6 text-white shadow-sm">
               <p className="text-sm font-semibold text-white/70">Delivery partner</p>
               <h2 className="mt-2 text-2xl font-bold">{order.deliveryPartner.name}</h2>
               <p className="mt-1 text-sm text-white/75 capitalize">
                 {order.deliveryPartner.vehicleType} rider
               </p>
-              <p className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold">
-                <PhoneIcon className="size-4" />
-                {order.deliveryPartner.phone}
-              </p>
+              {order.deliveryPartner.phone && (
+                <p className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold">
+                  <PhoneIcon className="size-4" aria-hidden="true" />
+                  {order.deliveryPartner.phone}
+                </p>
+              )}
             </section>
           )}
         </aside>
@@ -164,4 +162,3 @@ const OrderTracking = () => {
 };
 
 export default OrderTracking;
-

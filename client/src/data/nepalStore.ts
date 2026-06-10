@@ -1,11 +1,11 @@
-import { categoriesData, dummyProducts } from "../assets/assets";
+import { categoriesData } from "../assets/assets";
 import type { Address, Category, DeliveryPartner, Order, Product } from "../types";
 
 const catalogDate = "2026-05-30T10:15:00.000Z";
 
 type ProductInput = Omit<
   Product,
-  "_id" | "image" | "stock" | "rating" | "reviewCount" | "discount" | "createdAt"
+  "id" | "image" | "stock" | "rating" | "reviewCount" | "discount" | "createdAt"
 > & {
   imageIndex: number;
   stock?: number;
@@ -13,7 +13,8 @@ type ProductInput = Omit<
   reviewCount?: number;
 };
 
-const productImage = (index: number) => dummyProducts[index % dummyProducts.length].image;
+const productImages = categoriesData.map((category) => category.image);
+const productImage = (index: number) => productImages[index % productImages.length] ?? "";
 
 const makeProduct = (id: string, input: ProductInput): Product => {
   const discount = Math.max(
@@ -22,7 +23,7 @@ const makeProduct = (id: string, input: ProductInput): Product => {
   );
 
   return {
-    _id: id,
+    id: id,
     name: input.name,
     description: input.description,
     price: input.price,
@@ -389,7 +390,7 @@ export const nepalProducts: Product[] = [
 
 export const nepalAddressData: Address[] = [
   {
-    _id: "addr-lazimpat-home",
+    id: "addr-lazimpat-home",
     label: "Home",
     address: "Lazimpat Road, near Japanese Embassy",
     city: "Kathmandu",
@@ -400,7 +401,7 @@ export const nepalAddressData: Address[] = [
     lng: 85.3206,
   },
   {
-    _id: "addr-pulchowk-work",
+    id: "addr-pulchowk-work",
     label: "Work",
     address: "Pulchowk, near Labim Mall",
     city: "Lalitpur",
@@ -413,7 +414,7 @@ export const nepalAddressData: Address[] = [
 ];
 
 export const nepalDeliveryPartner: DeliveryPartner = {
-  _id: "partner-suman",
+  id: "partner-suman",
   name: "Suman Tamang",
   email: "suman.delivery@quickbasket.com",
   phone: "9801234567",
@@ -425,11 +426,11 @@ export const nepalDeliveryPartner: DeliveryPartner = {
 
 const sampleOrderItems = [nepalProducts[0], nepalProducts[10], nepalProducts[21]].map(
   (product) => ({
-    product: product._id,
+    product: product.id,
     name: product.name,
     image: product.image,
     price: product.price,
-    quantity: product._id === "np-waiwai-family" ? 2 : 1,
+    quantity: product.id === "np-waiwai-family" ? 2 : 1,
     unit: product.unit,
   }),
 );
@@ -441,9 +442,9 @@ const sampleSubtotal = sampleOrderItems.reduce(
 
 export const nepalOrdersData: Order[] = [
   {
-    _id: "QB-NP-240601",
+    id: "QB-NP-240601",
     user: {
-      _id: "user-aarav",
+      id: "user-aarav",
       name: "Aarav Shrestha",
       email: "aarav@example.com",
       phone: "9800000000",
@@ -501,4 +502,3 @@ export const deliveryWindows = [
 
 export const getCategoryName = (slug: string) =>
   nepalCategories.find((category) => category.slug === slug)?.name ?? "Groceries";
-

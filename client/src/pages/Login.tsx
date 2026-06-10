@@ -1,23 +1,33 @@
 import { AtSignIcon, BikeIcon, LockIcon, UserIcon } from "lucide-react";
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { heroSectionData } from "../assets/assets";
-import { useAppContext } from "../context/AppContext";
+import LoadingButton from "../components/ui/LoadingButton";
+import { useAuth } from "../context/AuthContext";
 
 const Login = () => {
-  const { login, register } = useAppContext();
+  const { isAuthenticated, login, loading: authLoading, register } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
   const [isLoginState, setIsLoginState] = useState(true);
-  const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const from = (location.state as { from?: string } | null)?.from ?? "/";
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(from, { replace: true });
+    }
+  }, [from, isAuthenticated, navigate]);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim().toLowerCase();
 
     if (!isLoginState && password !== confirmPassword) {
       toast.error("Passwords do not match");
@@ -29,20 +39,18 @@ const Login = () => {
       return;
     }
 
-    setLoading(true);
+    if (!isLoginState && !trimmedName) {
+      toast.error("Please enter your name");
+      return;
+    }
 
-    window.setTimeout(() => {
-      const displayName = isLoginState ? email.split("@")[0] || "QuickBasket Customer" : name;
+    const success = isLoginState
+      ? await login(trimmedEmail, password)
+      : await register(trimmedName, trimmedEmail, password);
 
-      if (isLoginState) {
-        login(displayName, email);
-      } else {
-        register(displayName, email);
-      }
-
-      setLoading(false);
-      navigate("/");
-    }, 500);
+    if (success) {
+      navigate(from, { replace: true });
+    }
   };
 
   const inputClass =
@@ -62,7 +70,7 @@ const Login = () => {
             <span className="flex size-12 items-center justify-center rounded-2xl bg-white/15">
               <BikeIcon className="size-7" />
             </span>
-            QuickBasket Nepal
+            QuickBasket
           </Link>
           <h1 className="text-5xl font-bold leading-tight">
             Groceries for the way Nepal shops.
@@ -78,7 +86,7 @@ const Login = () => {
           <div className="text-center">
             <Link to="/" className="inline-flex items-center gap-2 text-2xl font-bold text-app-green">
               <BikeIcon className="size-8" />
-              QuickBasket Nepal
+              QuickBasket 
             </Link>
             <h2 className="mt-8 text-3xl font-bold text-zinc-950">
               {isLoginState ? "Welcome back" : "Create your account"}
@@ -160,13 +168,13 @@ const Login = () => {
               </label>
             )}
 
-            <button
+            <LoadingButton
               type="submit"
-              disabled={loading}
-              className="flex w-full items-center justify-center rounded-full bg-app-green px-5 py-3 text-sm font-semibold text-white hover:bg-app-green-light disabled:cursor-not-allowed disabled:opacity-70"
+              loading={authLoading}
+              className="w-full"
             >
-              {loading ? "Please wait..." : isLoginState ? "Sign in" : "Create account"}
-            </button>
+              {isLoginState ? "Sign in" : "Create account"}
+            </LoadingButton>
           </form>
         </div>
       </section>
@@ -175,4 +183,3 @@ const Login = () => {
 };
 
 export default Login;
-

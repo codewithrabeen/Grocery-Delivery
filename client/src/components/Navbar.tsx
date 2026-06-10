@@ -15,6 +15,7 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAppContext } from "../context/AppContext";
+import { useAuth } from "../context/AuthContext";
 
 const navLinks = [
   { label: "Home", to: "/" },
@@ -23,7 +24,8 @@ const navLinks = [
 ];
 
 const Navbar = () => {
-  const { cartCount, logout, setIsCartOpen, user } = useAppContext();
+  const { cartCount, setIsCartOpen } = useAppContext();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
