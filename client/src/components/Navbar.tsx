@@ -162,7 +162,7 @@ const Navbar = () => {
                   </Link>
                   {user.isAdmin && (
                     <Link
-                      to="/admin/products"
+                      to="/admin"
                       onClick={() => setUserMenuOpen(false)}
                       className="flex items-center gap-3 px-4 py-3 text-sm text-app-orange hover:bg-orange-50"
                     >
@@ -236,6 +236,15 @@ const Navbar = () => {
                 >
                   Addresses
                 </Link>
+                {user.isAdmin && (
+                  <Link
+                    to="/admin"
+                    onClick={() => setMobileOpen(false)}
+                    className="block rounded-xl px-3 py-3 text-sm font-medium text-app-orange hover:bg-orange-50"
+                  >
+                    Admin panel
+                  </Link>
+                )}
                 <button
                   type="button"
                   onClick={handleLogout}

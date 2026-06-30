@@ -1,11 +1,28 @@
 import { ArrowRightIcon, PackageIcon, ReceiptTextIcon } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useEffect } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { statusColors } from "../assets/assets";
+import EmptyState from "../components/ui/EmptyState";
+import ErrorState from "../components/ui/ErrorState";
+import { Skeleton } from "../components/ui/Skeleton";
 import { useAppContext } from "../context/AppContext";
 import { formatDate, formatPrice } from "../lib/format";
 
 const MyOrders = () => {
-  const { orders } = useAppContext();
+  const { clearCart, orders, ordersError, ordersLoading, refreshOrders } = useAppContext();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const clearCartRequested = searchParams.get("clearCart") === "true";
+
+  useEffect(() => {
+    if (!clearCartRequested) return;
+
+    clearCart();
+    void refreshOrders();
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("clearCart");
+    setSearchParams(next, { replace: true });
+  }, [clearCart, clearCartRequested, refreshOrders, searchParams, setSearchParams]);
 
   return (
     <div className="min-h-screen bg-app-cream">
@@ -20,22 +37,30 @@ const MyOrders = () => {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {orders.length === 0 ? (
-          <div className="rounded-2xl bg-white px-6 py-14 text-center shadow-sm">
-            <PackageIcon className="mx-auto mb-5 size-12 text-zinc-300" />
-            <h2 className="text-2xl font-semibold text-zinc-950">No orders yet</h2>
-            <p className="mt-2 text-zinc-500">Your completed checkouts will appear here.</p>
-            <Link
-              to="/products"
-              className="mt-6 inline-flex rounded-full bg-app-green px-5 py-3 text-sm font-semibold text-white hover:bg-app-green-light"
-            >
-              Shop groceries
-            </Link>
+        {ordersLoading ? (
+          <div className="space-y-5">
+            {Array.from({ length: 3 }, (_, index) => (
+              <div key={index} className="rounded-lg bg-white p-5 shadow-sm">
+                <Skeleton className="h-7 w-56" />
+                <Skeleton className="mt-3 h-4 w-44" />
+                <Skeleton className="mt-5 h-16 w-full" />
+              </div>
+            ))}
           </div>
+        ) : ordersError ? (
+          <ErrorState message={ordersError} onRetry={() => void refreshOrders()} />
+        ) : orders.length === 0 ? (
+          <EmptyState
+            icon={PackageIcon}
+            title="No orders yet"
+            description="Your completed checkouts will appear here."
+            actionLabel="Shop groceries"
+            actionTo="/products"
+          />
         ) : (
           <div className="space-y-5">
             {orders.map((order) => (
-              <article key={order.id} className="rounded-2xl bg-white p-5 shadow-sm">
+              <article key={order.id} className="rounded-lg bg-white p-5 shadow-sm">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex gap-4">
                     <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-green-50 text-app-green">
@@ -77,7 +102,10 @@ const MyOrders = () => {
 
                 <div className="mt-5 grid gap-3 border-t border-zinc-200 pt-5 sm:grid-cols-2 lg:grid-cols-4">
                   {order.items.slice(0, 4).map((item) => (
-                    <div key={`${order.id}-${item.product}`} className="flex items-center gap-3">
+                    <div
+                      key={`${order.id}-${item.product ?? item.productId ?? item.id ?? item.name}`}
+                      className="flex items-center gap-3"
+                    >
                       <img
                         src={item.image}
                         alt={item.name}

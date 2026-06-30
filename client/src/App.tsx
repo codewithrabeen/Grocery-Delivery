@@ -11,7 +11,7 @@ import Login from "./pages/Login";
 const Home = lazy(() => import("./pages/Home"));
 const Products = lazy(() => import("./pages/Products"));
 const ProductPage = lazy(() => import("./pages/ProductPage"));
-const SearchResults = lazy(() => import("./pages/SearchResuts"));
+const SearchResults = lazy(() => import("./pages/SearchResults"));
 const FlashDeals = lazy(() => import("./pages/FlashDeals"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const MyOrders = lazy(() => import("./pages/MyOrders"));
@@ -19,6 +19,7 @@ const OrderTracking = lazy(() => import("./pages/OrderTracking"));
 const Addresses = lazy(() => import("./pages/Addresses"));
 const Wishlist = lazy(() => import("./pages/Wishlist"));
 const Profile = lazy(() => import("./pages/Profile"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const About = lazy(() => import("./pages/About"));
 const Contact = lazy(() => import("./pages/Contact"));
 const Privacy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -62,6 +63,8 @@ const App = () => (
               <Route path="addresses" element={<Addresses />} />
               <Route path="wishlist" element={<Wishlist />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="admin" element={<AdminDashboard />} />
+              <Route path="admin/products" element={<AdminDashboard />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
