@@ -3,6 +3,7 @@ import type { LiveLocation, Order, OrderItem, ShippingAddress } from "../types";
 
 type OrderResponse = {
   order?: Order;
+  orderId?: string;
   orders?: Order[];
   url?: string;
 };
@@ -14,7 +15,7 @@ export type CreateOrderPayload = {
 };
 
 export type CreateOrderResult =
-  | { type: "redirect"; url: string }
+  | { type: "redirect"; url: string; orderId?: string }
   | { type: "order"; order: Order };
 
 const normalizeItems = (items: OrderItem[] = []) =>
@@ -45,7 +46,7 @@ export const orderService = {
     const { data } = await api.post<OrderResponse | Order>("/orders", payload);
 
     if ("url" in data && data.url) {
-      return { type: "redirect", url: data.url };
+      return { type: "redirect", url: data.url, orderId: data.orderId };
     }
 
     const order = "order" in data && data.order ? data.order : (data as Order);
@@ -69,5 +70,17 @@ export const orderService = {
       `/orders/${id}/location`,
     );
     return data;
+  },
+
+  async confirmStripePayment(orderId: string, sessionId: string) {
+    const { data } = await api.post<OrderResponse>(`/orders/${orderId}/confirm-payment`, {
+      sessionId,
+    });
+
+    if (!data.order) {
+      throw new Error("Payment was confirmed, but the order could not be loaded");
+    }
+
+    return normalizeOrder(data.order);
   },
 };

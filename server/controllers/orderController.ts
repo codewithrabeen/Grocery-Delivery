@@ -1,49 +1,13 @@
 import { Request, Response } from "express";
 import Stripe from "stripe";
 import { prisma } from "../config/prisma.js";
-import { inngest } from "../inngest/index.js";
+import { fulfillPaidOrder, reduceStock, sendOrderEvents } from "../services/orderFulfillment.js";
 
 const CARD_PAYMENT_METHOD = "card";
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 
 const getRequestOrigin = (req: Request) =>
   typeof req.headers.origin === "string" ? req.headers.origin : CLIENT_URL;
-
-const reduceStock = async (orderItems: { productId: string; quantity: number }[]) => {
-  for (const item of orderItems) {
-    await prisma.product.update({
-      where: {
-        id: item.productId,
-      },
-      data: {
-        stock: {
-          decrement: item.quantity,
-        },
-      },
-    });
-  }
-};
-
-const sendOrderEvents = async (
-  orderId: string,
-  orderItems: { productId: string; quantity: number }[],
-) => {
-  for (const item of orderItems) {
-    await inngest.send({
-      name: "inventory/stock.updated",
-      data: {
-        productId: item.productId,
-      },
-    });
-  }
-
-  await inngest.send({
-    name: "order/placed",
-    data: {
-      orderId,
-    },
-  });
-};
 
 // Create Order
 // Post/api/order
@@ -145,7 +109,7 @@ export const createOrder = async (req: Request, res: Response) => {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
       const origin = getRequestOrigin(req);
       const session = await stripe.checkout.sessions.create({
-        success_url: `${origin}/orders?clearCart=true`,
+        success_url: `${origin}/payment/success?orderId=${order.id}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/checkout`,
         line_items: [
           {
@@ -169,7 +133,7 @@ export const createOrder = async (req: Request, res: Response) => {
         });
       }
 
-      return res.status(201).json({ url: session.url });
+      return res.status(201).json({ url: session.url, orderId: order.id });
     }
 
     await reduceStock(orderItems);
@@ -181,6 +145,74 @@ export const createOrder = async (req: Request, res: Response) => {
 
     return res.status(500).json({
       message: "Failed to create order",
+    });
+  }
+};
+
+export const confirmStripePayment = async (req: Request, res: Response) => {
+  try {
+    const orderId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { sessionId } = req.body;
+
+    if (!sessionId || typeof sessionId !== "string") {
+      return res.status(400).json({ message: "Stripe session id is required" });
+    }
+
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return res.status(500).json({ message: "Stripe is not configured" });
+    }
+
+    const order = await prisma.order.findFirst({
+      where: {
+        id: orderId,
+        userId: req.user!.id,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    if (order.paymentMethod !== CARD_PAYMENT_METHOD) {
+      return res.status(400).json({ message: "This order does not use card payment" });
+    }
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+    if (session.metadata?.orderId !== orderId) {
+      return res.status(400).json({ message: "Stripe session does not match this order" });
+    }
+
+    if (session.payment_status !== "paid") {
+      return res.status(402).json({ message: "Payment has not been completed" });
+    }
+
+    await fulfillPaidOrder(orderId);
+
+    const paidOrder = await prisma.order.findFirst({
+      where: {
+        id: orderId,
+        userId: req.user!.id,
+      },
+      include: {
+        deliveryPartner: {
+          select: {
+            id: true,
+            phone: true,
+            avatar: true,
+            vehicleType: true,
+          },
+        },
+      },
+    });
+
+    return res.json({ order: paidOrder });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      message: "Failed to confirm Stripe payment",
     });
   }
 };

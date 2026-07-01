@@ -1,72 +1,11 @@
 import { Request, Response } from "express";
 import Stripe from "stripe";
-import { prisma } from "../config/prisma.js";
-import { inngest } from "../inngest/index.js";
+import { deleteUnpaidOrder, fulfillPaidOrder } from "../services/orderFulfillment.js";
 
 const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY)
   : null;
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-type OrderItem = {
-  productId?: string;
-  quantity?: number;
-};
-
-const readOrderItems = (items: unknown): OrderItem[] => (Array.isArray(items) ? items : []);
-
-const fulfillPaidOrder = async (orderId: string) => {
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-  });
-
-  if (!order || order.isPaid) return;
-
-  const paidOrder = await prisma.order.update({
-    where: { id: orderId },
-    data: { isPaid: true },
-  });
-
-  const orderItems = readOrderItems(paidOrder.items);
-
-  for (const item of orderItems) {
-    if (!item.productId || !item.quantity) continue;
-
-    await prisma.product.update({
-      where: {
-        id: item.productId,
-      },
-      data: {
-        stock: {
-          decrement: item.quantity,
-        },
-      },
-    });
-
-    await inngest.send({
-      name: "inventory/stock.updated",
-      data: {
-        productId: item.productId,
-      },
-    });
-  }
-
-  await inngest.send({
-    name: "order/placed",
-    data: { orderId },
-  });
-};
-
-const deleteUnpaidOrder = async (orderId?: string) => {
-  if (!orderId) return;
-
-  await prisma.order.deleteMany({
-    where: {
-      id: orderId,
-      isPaid: false,
-    },
-  });
-};
 
 export const stripeWebhook = async (req: Request, res: Response) => {
   if (!stripe || !endpointSecret) {
