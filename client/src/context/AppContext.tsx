@@ -65,6 +65,7 @@ type AppContextValue = {
     addressId: string,
     paymentMethod: PaymentMethodId,
     deliveryWindow: string,
+    couponCode?: string,
   ) => Promise<CreateOrderResult | null>;
   toggleWishlist: (productId: string) => Promise<void>;
   isWishlisted: (productId: string) => boolean;
@@ -203,7 +204,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, [cartQuantities, user?.id]);
 
   const productMap = useMemo(
-    () => new Map(products.map((product) => [product.id, product])),
+    () => new Map(products.filter((product) => product.id).map((product) => [product.id, product])),
     [products],
   );
 
@@ -350,7 +351,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const placeOrder = useCallback(
-    async (addressId: string, paymentMethod: PaymentMethodId, deliveryWindow: string) => {
+    async (
+      addressId: string,
+      paymentMethod: PaymentMethodId,
+      deliveryWindow: string,
+      couponCode?: string,
+    ) => {
       const address = addresses.find((item) => item.id === addressId);
 
       if (!address) {
@@ -364,13 +370,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
+        const orderItems = cartItems
+          .map((item) => ({
+            productId: item.product.id,
+            quantity: item.quantity,
+          }))
+          .filter((item) => item.productId && item.quantity > 0);
+
+        if (orderItems.length !== cartItems.length) {
+          toast.error("Some cart items are no longer available. Please refresh your cart.");
+          return null;
+        }
+
         const result = await orderService.createOrder(
           createPaymentPayload(
             {
-              items: cartItems.map((item) => ({
-                productId: item.product.id,
-                quantity: item.quantity,
-              })),
+              items: orderItems,
               shippingAddress: {
                 label: address.label,
                 address: address.address,
@@ -380,6 +395,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
                 lat: address.lat,
                 lng: address.lng,
               },
+              deliveryWindow,
+              couponCode,
             },
             paymentMethod,
           ),

@@ -5,6 +5,8 @@ type OrderResponse = {
   order?: Order;
   orderId?: string;
   orders?: Order[];
+  paymentId?: string;
+  provider?: string;
   url?: string;
 };
 
@@ -12,10 +14,12 @@ export type CreateOrderPayload = {
   items: { productId: string; quantity: number }[];
   shippingAddress: ShippingAddress;
   paymentMethod: string;
+  deliveryWindow?: string;
+  couponCode?: string;
 };
 
 export type CreateOrderResult =
-  | { type: "redirect"; url: string; orderId?: string }
+  | { type: "redirect"; url: string; orderId?: string; paymentId?: string; provider?: string }
   | { type: "order"; order: Order };
 
 const normalizeItems = (items: OrderItem[] = []) =>
@@ -30,6 +34,8 @@ export const normalizeOrder = (order: Order): Order => ({
   items: normalizeItems(order.items),
   deliveryFee: Number(order.deliveryFee ?? 0),
   tax: Number(order.tax ?? 0),
+  discount: Number(order.discount ?? 0),
+  paymentStatus: order.paymentStatus ?? (order.isPaid ? "PAID" : "PENDING"),
   deliveryPartner: order.deliveryPartner ?? null,
   deliveryOtp: order.deliveryOtp ?? "",
   isPaid: Boolean(order.isPaid),
@@ -46,7 +52,13 @@ export const orderService = {
     const { data } = await api.post<OrderResponse | Order>("/orders", payload);
 
     if ("url" in data && data.url) {
-      return { type: "redirect", url: data.url, orderId: data.orderId };
+      return {
+        type: "redirect",
+        url: data.url,
+        orderId: data.orderId,
+        paymentId: data.paymentId,
+        provider: data.provider,
+      };
     }
 
     const order = "order" in data && data.order ? data.order : (data as Order);
@@ -82,5 +94,51 @@ export const orderService = {
     }
 
     return normalizeOrder(data.order);
+  },
+
+  async verifyKhaltiPayment(orderId: string, pidx: string) {
+    const { data } = await api.post<OrderResponse>("/payments/khalti/verify", {
+      orderId,
+      pidx,
+    });
+
+    if (!data.order) {
+      throw new Error("Payment was verified, but the order could not be loaded");
+    }
+
+    return normalizeOrder(data.order);
+  },
+
+  async verifyEsewaPayment(transactionUuid: string, dataPayload?: string) {
+    const { data } = await api.post<OrderResponse>("/payments/esewa/verify", {
+      transactionUuid,
+      data: dataPayload,
+    });
+
+    if (!data.order) {
+      throw new Error("Payment was verified, but the order could not be loaded");
+    }
+
+    return normalizeOrder(data.order);
+  },
+
+  async retryPayment(orderId: string): Promise<CreateOrderResult> {
+    const { data } = await api.post<OrderResponse>(`/orders/${orderId}/retry-payment`);
+
+    if (data.url) {
+      return {
+        type: "redirect",
+        url: data.url,
+        orderId: data.orderId,
+        paymentId: data.paymentId,
+        provider: data.provider,
+      };
+    }
+
+    if (!data.order) {
+      throw new Error("Could not retry payment");
+    }
+
+    return { type: "order", order: normalizeOrder(data.order) };
   },
 };

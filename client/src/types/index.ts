@@ -4,7 +4,8 @@ export type ProductSort =
   | "newest"
   | "price-low"
   | "price-high"
-  | "rating";
+  | "rating"
+  | "featured";
 
 export type AvailabilityFilter = "all" | "in-stock" | "out-of-stock";
 
@@ -28,6 +29,9 @@ export interface User {
   email: string;
   phone?: string;
   avatar?: string;
+  dob?: string;
+  gender?: string;
+  walletBalance?: number;
   addresses?: Address[];
   isAdmin?: boolean;
   createdAt?: string;
@@ -51,8 +55,10 @@ export interface Product {
   unit: string;
   stock: number;
   isOrganic: boolean;
+  isFeatured?: boolean;
   rating: number;
   reviewCount: number;
+  soldCount?: number;
   discount: number;
   createdAt: string;
   updatedAt?: string;
@@ -96,13 +102,19 @@ export interface DeliveryPartner {
 }
 
 export type OrderStatus =
+  | "Pending"
   | "Placed"
   | "Confirmed"
   | "Assigned"
   | "Packed"
   | "Out for Delivery"
+  | "Out For Delivery"
   | "Delivered"
   | "Cancelled"
+  | "Returned"
+  | "Payment Pending"
+  | "Payment Failed"
+  | "Refunded"
   | string;
 
 export interface StatusHistoryItem {
@@ -125,16 +137,23 @@ export interface Order {
   items: OrderItem[];
   shippingAddress: ShippingAddress;
   paymentMethod: string;
+  paymentStatus?: string;
   subtotal: number;
   deliveryFee: number;
   tax: number;
+  discount?: number;
   total: number;
   status: OrderStatus;
   statusHistory: StatusHistoryItem[];
+  paymentHistory?: StatusHistoryItem[] | Record<string, unknown>[];
+  receipt?: Record<string, unknown> | null;
   deliveryPartner: DeliveryPartner | null;
   deliveryOtp?: string;
   liveLocation?: LiveLocation | null;
   isPaid: boolean;
+  isStockReduced?: boolean;
+  activePaymentId?: string | null;
+  retryCount?: number;
   createdAt: string;
   updatedAt?: string;
 }

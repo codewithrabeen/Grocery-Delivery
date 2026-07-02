@@ -1,12 +1,14 @@
 import { ArrowLeftIcon, ShoppingBasketIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { CheckOutAddress } from "../components/CheckOut/CheckOutAddress";
 import { CheckoutPayment } from "../components/CheckOut/CheckoutPayment";
 import { CheckoutReview } from "../components/CheckOut/CheckoutReview";
 import EmptyState from "../components/ui/EmptyState";
+import { getApiErrorMessage } from "../config/api";
 import { useAppContext } from "../context/AppContext";
+import { couponService } from "../services/couponService";
 import type { PaymentMethodId } from "../services/paymentService";
 
 const Checkout = () => {
@@ -17,8 +19,6 @@ const Checkout = () => {
     deliveryWindows,
     placeOrder,
     subtotal,
-    tax,
-    total,
   } = useAppContext();
   const navigate = useNavigate();
   const defaultAddress = useMemo(
@@ -29,7 +29,37 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>("cash");
   const [deliveryWindow, setDeliveryWindow] = useState(deliveryWindows[0]);
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponLoading, setCouponLoading] = useState(false);
   const selectedAddressId = manualAddressId || defaultAddress?.id || "";
+  const discountedSubtotal = Math.max(0, subtotal - couponDiscount);
+  const displayDeliveryFee = discountedSubtotal === 0 || discountedSubtotal >= 1500 ? 0 : deliveryFee;
+  const displayTax = Math.round(discountedSubtotal * 0.13);
+  const displayTotal = discountedSubtotal + displayDeliveryFee + displayTax;
+
+  useEffect(() => {
+    setCouponDiscount(0);
+  }, [subtotal, couponCode]);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error("Enter a coupon code");
+      return;
+    }
+
+    setCouponLoading(true);
+    try {
+      const result = await couponService.validateCoupon(couponCode, subtotal);
+      setCouponDiscount(result.discount);
+      toast.success(`${result.coupon?.code ?? couponCode} applied`);
+    } catch (error) {
+      setCouponDiscount(0);
+      toast.error(getApiErrorMessage(error, "Coupon could not be applied"));
+    } finally {
+      setCouponLoading(false);
+    }
+  };
 
   const handlePlaceOrder = async () => {
     if (!selectedAddressId) {
@@ -39,7 +69,12 @@ const Checkout = () => {
 
     setPlacingOrder(true);
     try {
-      const result = await placeOrder(selectedAddressId, paymentMethod, deliveryWindow);
+      const result = await placeOrder(
+        selectedAddressId,
+        paymentMethod,
+        deliveryWindow,
+        couponDiscount > 0 ? couponCode : undefined,
+      );
       if (!result) return;
 
       if (result.type === "redirect") {
@@ -98,12 +133,17 @@ const Checkout = () => {
 
           <CheckoutReview
             cartItems={cartItems}
-            deliveryFee={deliveryFee}
+            couponCode={couponCode}
+            couponDiscount={couponDiscount}
+            couponLoading={couponLoading}
+            deliveryFee={displayDeliveryFee}
             loading={placingOrder}
             subtotal={subtotal}
-            tax={tax}
-            total={total}
+            tax={displayTax}
+            total={displayTotal}
             disabled={!selectedAddressId}
+            onApplyCoupon={() => void handleApplyCoupon()}
+            onCouponCodeChange={setCouponCode}
             onPlaceOrder={() => void handlePlaceOrder()}
           />
         </div>

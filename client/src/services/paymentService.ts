@@ -25,14 +25,14 @@ export const paymentMethods: PaymentMethod[] = [
   {
     id: "esewa",
     label: "eSewa",
-    description: "Wallet structure ready for provider credentials.",
-    enabled: false,
+    description: "Pay with eSewa ePayment.",
+    enabled: true,
   },
   {
     id: "khalti",
     label: "Khalti",
-    description: "Wallet structure ready for provider credentials.",
-    enabled: false,
+    description: "Pay with Khalti wallet.",
+    enabled: true,
   },
 ];
 

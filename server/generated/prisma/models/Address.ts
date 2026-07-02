@@ -563,18 +563,6 @@ export type AddressUncheckedUpdateManyWithoutUserNestedInput = {
   deleteMany?: Prisma.AddressScalarWhereInput | Prisma.AddressScalarWhereInput[]
 }
 
-export type BoolFieldUpdateOperationsInput = {
-  set?: boolean
-}
-
-export type FloatFieldUpdateOperationsInput = {
-  set?: number
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
-}
-
 export type AddressCreateWithoutUserInput = {
   id?: string
   label: string

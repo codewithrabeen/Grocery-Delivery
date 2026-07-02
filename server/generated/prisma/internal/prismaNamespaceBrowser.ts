@@ -55,7 +55,13 @@ export const ModelName = {
   Address: 'Address',
   Product: 'Product',
   Order: 'Order',
-  DeliveryPartner: 'DeliveryPartner'
+  DeliveryPartner: 'DeliveryPartner',
+  Wishlist: 'Wishlist',
+  PaymentTransaction: 'PaymentTransaction',
+  Coupon: 'Coupon',
+  CouponRedemption: 'CouponRedemption',
+  WalletTransaction: 'WalletTransaction',
+  Review: 'Review'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -79,8 +85,15 @@ export const UserScalarFieldEnum = {
   name: 'name',
   email: 'email',
   password: 'password',
+  role: 'role',
   phone: 'phone',
   avatar: 'avatar',
+  dob: 'dob',
+  gender: 'gender',
+  walletBalance: 'walletBalance',
+  isEmailVerified: 'isEmailVerified',
+  refreshToken: 'refreshToken',
+  deletedAt: 'deletedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -117,8 +130,10 @@ export const ProductScalarFieldEnum = {
   unit: 'unit',
   stock: 'stock',
   isOrganic: 'isOrganic',
+  isFeatured: 'isFeatured',
   rating: 'rating',
   reviewCount: 'reviewCount',
+  soldCount: 'soldCount',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -128,20 +143,41 @@ export type ProductScalarFieldEnum = (typeof ProductScalarFieldEnum)[keyof typeo
 
 export const OrderScalarFieldEnum = {
   id: 'id',
+  orderNumber: 'orderNumber',
   userId: 'userId',
   items: 'items',
   shippingAddress: 'shippingAddress',
   paymentMethod: 'paymentMethod',
+  paymentStatus: 'paymentStatus',
   subtotal: 'subtotal',
   deliveryFee: 'deliveryFee',
   tax: 'tax',
+  discount: 'discount',
   total: 'total',
   status: 'status',
   statusHistory: 'statusHistory',
+  paymentHistory: 'paymentHistory',
+  paymentLogs: 'paymentLogs',
+  receipt: 'receipt',
+  couponCode: 'couponCode',
+  couponId: 'couponId',
+  deliveryWindow: 'deliveryWindow',
   deliveryPartnerId: 'deliveryPartnerId',
   deliveryOtp: 'deliveryOtp',
   liveLocation: 'liveLocation',
   isPaid: 'isPaid',
+  isStockReduced: 'isStockReduced',
+  activePaymentId: 'activePaymentId',
+  paymentFailureReason: 'paymentFailureReason',
+  retryCount: 'retryCount',
+  estimatedDeliveryAt: 'estimatedDeliveryAt',
+  confirmedAt: 'confirmedAt',
+  packedAt: 'packedAt',
+  outForDeliveryAt: 'outForDeliveryAt',
+  deliveredAt: 'deliveredAt',
+  cancelledAt: 'cancelledAt',
+  returnedAt: 'returnedAt',
+  refundedAt: 'refundedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -163,6 +199,104 @@ export const DeliveryPartnerScalarFieldEnum = {
 } as const
 
 export type DeliveryPartnerScalarFieldEnum = (typeof DeliveryPartnerScalarFieldEnum)[keyof typeof DeliveryPartnerScalarFieldEnum]
+
+
+export const WishlistScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  productId: 'productId',
+  createdAt: 'createdAt'
+} as const
+
+export type WishlistScalarFieldEnum = (typeof WishlistScalarFieldEnum)[keyof typeof WishlistScalarFieldEnum]
+
+
+export const PaymentTransactionScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  userId: 'userId',
+  provider: 'provider',
+  paymentMethod: 'paymentMethod',
+  amount: 'amount',
+  currency: 'currency',
+  status: 'status',
+  pidx: 'pidx',
+  transactionId: 'transactionId',
+  transactionUuid: 'transactionUuid',
+  transactionCode: 'transactionCode',
+  gatewayReference: 'gatewayReference',
+  requestPayload: 'requestPayload',
+  verificationResponse: 'verificationResponse',
+  failureReason: 'failureReason',
+  paymentUrl: 'paymentUrl',
+  expiresAt: 'expiresAt',
+  verifiedAt: 'verifiedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PaymentTransactionScalarFieldEnum = (typeof PaymentTransactionScalarFieldEnum)[keyof typeof PaymentTransactionScalarFieldEnum]
+
+
+export const CouponScalarFieldEnum = {
+  id: 'id',
+  code: 'code',
+  description: 'description',
+  discountType: 'discountType',
+  discountValue: 'discountValue',
+  minimumOrder: 'minimumOrder',
+  maximumDiscount: 'maximumDiscount',
+  startsAt: 'startsAt',
+  expiresAt: 'expiresAt',
+  usageLimit: 'usageLimit',
+  perUserLimit: 'perUserLimit',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CouponScalarFieldEnum = (typeof CouponScalarFieldEnum)[keyof typeof CouponScalarFieldEnum]
+
+
+export const CouponRedemptionScalarFieldEnum = {
+  id: 'id',
+  couponId: 'couponId',
+  userId: 'userId',
+  orderId: 'orderId',
+  discount: 'discount',
+  createdAt: 'createdAt'
+} as const
+
+export type CouponRedemptionScalarFieldEnum = (typeof CouponRedemptionScalarFieldEnum)[keyof typeof CouponRedemptionScalarFieldEnum]
+
+
+export const WalletTransactionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  type: 'type',
+  amount: 'amount',
+  balanceAfter: 'balanceAfter',
+  reference: 'reference',
+  description: 'description',
+  metadata: 'metadata',
+  createdAt: 'createdAt'
+} as const
+
+export type WalletTransactionScalarFieldEnum = (typeof WalletTransactionScalarFieldEnum)[keyof typeof WalletTransactionScalarFieldEnum]
+
+
+export const ReviewScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  productId: 'productId',
+  orderId: 'orderId',
+  rating: 'rating',
+  comment: 'comment',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ReviewScalarFieldEnum = (typeof ReviewScalarFieldEnum)[keyof typeof ReviewScalarFieldEnum]
 
 
 export const SortOrder = {

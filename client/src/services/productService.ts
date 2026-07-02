@@ -14,11 +14,16 @@ export type ProductQuery = {
 
 type ProductsResponse = {
   products?: Product[];
+  product?: Product;
 };
 
 const FALLBACK_DATE = new Date(0).toISOString();
 
-export const normalizeProduct = (product: Product): Product => {
+type ProductApiResponse = Product & {
+  _id?: string;
+};
+
+export const normalizeProduct = (product: ProductApiResponse): Product => {
   const originalPrice = Number(product.originalPrice || product.price || 0);
   const price = Number(product.price || 0);
   const discount =
@@ -27,6 +32,7 @@ export const normalizeProduct = (product: Product): Product => {
 
   return {
     ...product,
+    id: product.id ?? product._id ?? "",
     description: product.description ?? "",
     price,
     originalPrice: originalPrice || price,
@@ -107,7 +113,17 @@ export const productService = {
   },
 
   async getProductById(id: string) {
-    const products = await this.getProducts();
-    return products.find((product) => product.id === id) ?? null;
+    const { data } = await api.get<ProductsResponse>(`/products/${id}`);
+    return data.product ? normalizeProduct(data.product) : null;
+  },
+
+  async getRelatedProducts(id: string) {
+    const { data } = await api.get<ProductsResponse>(`/products/${id}/related`);
+    return (data.products ?? []).map(normalizeProduct);
+  },
+
+  async getFrequentlyBoughtTogether(id: string) {
+    const { data } = await api.get<ProductsResponse>(`/products/${id}/frequently-bought-together`);
+    return (data.products ?? []).map(normalizeProduct);
   },
 };

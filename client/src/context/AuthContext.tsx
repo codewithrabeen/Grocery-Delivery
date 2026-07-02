@@ -16,6 +16,7 @@ import type { User } from "../types";
 
 type AuthResponse = {
   token: string;
+  refreshToken?: string;
   user: User;
   message?: string;
 };
@@ -52,10 +53,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("auth:unauthorized", handleUnauthorized);
   }, []);
 
-  const persistSession = useCallback((nextToken: string, nextUser: User) => {
+  const persistSession = useCallback((nextToken: string, nextUser: User, nextRefreshToken?: string) => {
     setUser(nextUser);
     setToken(nextToken);
     localStorage.setItem("auth_token", nextToken);
+    if (nextRefreshToken) localStorage.setItem("auth_refresh_token", nextRefreshToken);
     writeJsonStorage("auth_user", nextUser);
   }, []);
 
@@ -64,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       try {
         const { data } = await api.post<AuthResponse>("/auth/login", { email, password });
-        persistSession(data.token, data.user);
+        persistSession(data.token, data.user, data.refreshToken);
         toast.success("Signed in successfully");
         return true;
       } catch (error) {
@@ -82,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       try {
         const { data } = await api.post<AuthResponse>("/auth/register", { name, email, password });
-        persistSession(data.token, data.user);
+        persistSession(data.token, data.user, data.refreshToken);
         toast.success("Account created successfully");
         return true;
       } catch (error) {
@@ -99,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setToken(null);
     removeStorage("auth_token");
+    removeStorage("auth_refresh_token");
     removeStorage("auth_user");
     toast.success("Signed out");
     navigate("/");

@@ -15,6 +15,7 @@ const SearchResults = lazy(() => import("./pages/SearchResults"));
 const FlashDeals = lazy(() => import("./pages/FlashDeals"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+const PaymentFailure = lazy(() => import("./pages/PaymentFailure"));
 const MyOrders = lazy(() => import("./pages/MyOrders"));
 const OrderTracking = lazy(() => import("./pages/OrderTracking"));
 const Addresses = lazy(() => import("./pages/Addresses"));
@@ -60,6 +61,7 @@ const App = () => (
             <Route element={<ProtectedRoute />}>
               <Route path="checkout" element={<Checkout />} />
               <Route path="payment/success" element={<PaymentSuccess />} />
+              <Route path="payment/failure" element={<PaymentFailure />} />
               <Route path="orders" element={<MyOrders />} />
               <Route path="orders/:id" element={<OrderTracking />} />
               <Route path="addresses" element={<Addresses />} />

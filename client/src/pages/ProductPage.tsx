@@ -9,16 +9,19 @@ import {
   StarIcon,
   TruckIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import toast from "react-hot-toast";
 import { Link, useParams } from "react-router-dom";
 import ProductCard from "../components/ProductCard";
 import ErrorState from "../components/ui/ErrorState";
 import { Skeleton } from "../components/ui/Skeleton";
 import { getApiErrorMessage } from "../config/api";
 import { useAppContext } from "../context/AppContext";
+import { useAuth } from "../context/AuthContext";
 import { getCategoryName } from "../lib/categories";
-import { formatPrice } from "../lib/format";
+import { formatDate, formatPrice } from "../lib/format";
 import { productService } from "../services/productService";
+import { reviewService, type ProductReview } from "../services/reviewService";
 import type { Product } from "../types";
 
 const ProductPage = () => {
@@ -27,11 +30,13 @@ const ProductPage = () => {
     addToCart,
     cartQuantities,
     isWishlisted,
+    orders,
     productLoading,
     products,
     toggleWishlist,
     updateCartQuantity,
   } = useAppContext();
+  const { user } = useAuth();
   const cachedProduct = useMemo(() => products.find((item) => item.id === id) ?? null, [id, products]);
   const [remoteState, setRemoteState] = useState<{
     error: string | null;
@@ -44,6 +49,10 @@ const ProductPage = () => {
     product: null,
     productId: null,
   });
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: "" });
 
   useEffect(() => {
     if (!id || cachedProduct || productLoading) {
@@ -93,6 +102,56 @@ const ProductPage = () => {
         : [],
     [product, products],
   );
+  const purchasedOrder = useMemo(() => {
+    if (!product) return null;
+
+    return (
+      orders.find((order) =>
+        order.items.some(
+          (item) => item.productId === product.id || item.product === product.id || item.id === product.id,
+        ),
+      ) ?? null
+    );
+  }, [orders, product]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    setReviewLoading(true);
+    void reviewService
+      .getProductReviews(id)
+      .then(setReviews)
+      .finally(() => setReviewLoading(false));
+  }, [id]);
+
+  const handleReviewSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!product || !purchasedOrder) {
+      toast.error("You can review this after purchasing it");
+      return;
+    }
+
+    setReviewSaving(true);
+    try {
+      const review = await reviewService.saveReview({
+        productId: product.id,
+        orderId: purchasedOrder.id,
+        rating: reviewForm.rating,
+        comment: reviewForm.comment,
+      });
+
+      if (review) {
+        setReviews((current) => [review, ...current.filter((item) => item.id !== review.id)]);
+      }
+      setReviewForm({ rating: 5, comment: "" });
+      toast.success("Review saved");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Could not save review"));
+    } finally {
+      setReviewSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -292,6 +351,78 @@ const ProductPage = () => {
           </div>
         </section>
       )}
+
+      <section className="mx-auto grid max-w-7xl gap-6 px-4 pb-12 sm:px-6 lg:grid-cols-[1fr_380px] lg:px-8">
+        <div className="rounded-lg bg-white p-6 shadow-sm">
+          <h2 className="text-2xl font-bold text-zinc-950">Customer reviews</h2>
+          <div className="mt-5 space-y-4">
+            {reviewLoading ? (
+              <Skeleton className="h-24 w-full" />
+            ) : reviews.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-zinc-300 bg-zinc-50 p-5 text-sm text-zinc-500">
+                No reviews yet.
+              </p>
+            ) : (
+              reviews.map((review) => (
+                <article key={review.id} className="rounded-lg border border-zinc-200 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-semibold text-zinc-950">{review.user?.name ?? "Customer"}</p>
+                    <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-500">
+                      <StarIcon className="size-4 fill-current" aria-hidden="true" />
+                      {review.rating}
+                    </span>
+                  </div>
+                  {review.comment && <p className="mt-2 text-sm leading-6 text-zinc-600">{review.comment}</p>}
+                  <p className="mt-2 text-xs text-zinc-400">{formatDate(review.createdAt)}</p>
+                </article>
+              ))
+            )}
+          </div>
+        </div>
+
+        <form onSubmit={handleReviewSubmit} className="h-fit rounded-lg bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-zinc-950">Rate this product</h2>
+          <p className="mt-2 text-sm leading-6 text-zinc-500">
+            {user
+              ? purchasedOrder
+                ? "Share feedback from your purchase."
+                : "Reviews unlock after purchase."
+              : "Sign in to review purchased products."}
+          </p>
+          <label className="mt-5 block">
+            <span className="text-sm font-semibold text-zinc-700">Rating</span>
+            <select
+              value={reviewForm.rating}
+              onChange={(event) =>
+                setReviewForm({ ...reviewForm, rating: Number(event.target.value) })
+              }
+              className="mt-2 w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm focus:border-app-green focus:bg-white focus:outline-none"
+            >
+              {[5, 4, 3, 2, 1].map((rating) => (
+                <option key={rating} value={rating}>
+                  {rating} stars
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="mt-4 block">
+            <span className="text-sm font-semibold text-zinc-700">Review</span>
+            <textarea
+              value={reviewForm.comment}
+              onChange={(event) => setReviewForm({ ...reviewForm, comment: event.target.value })}
+              rows={4}
+              className="mt-2 w-full resize-none rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm focus:border-app-green focus:bg-white focus:outline-none"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={!user || !purchasedOrder || reviewSaving}
+            className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-app-green px-5 py-3 text-sm font-semibold text-white hover:bg-app-green-light disabled:cursor-not-allowed disabled:bg-zinc-300 focus:outline-none focus:ring-2 focus:ring-app-green focus:ring-offset-2"
+          >
+            {reviewSaving ? "Saving" : "Save review"}
+          </button>
+        </form>
+      </section>
     </div>
   );
 };

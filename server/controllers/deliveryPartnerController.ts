@@ -1,204 +1,178 @@
-import { Request, Response } from "express"
+import bcrypt from "bcrypt";
+import { Request, Response } from "express";
+import Jwt from "jsonwebtoken";
 import { prisma } from "../config/prisma.js";
-import bcrypt from 'bcrypt'
-import Jwt  from "jsonwebtoken";
-import { timeStamp } from "node:console";
+import { asyncHandler, routeParam } from "../utils/api.js";
+import { appendStatusHistory, cancelOrder, ORDER_STATUS } from "../services/orderFulfillment.js";
+import { sendOrderNotification } from "../services/notificationService.js";
 
+const generateToken = (id: string) =>
+  Jwt.sign({ id, role: "delivery" }, process.env.JWT_SECRET as string, { expiresIn: "30d" });
 
-const generateToken = (id: string)=> {
- return Jwt.sign({id, role: "delivery"}, process.env.JWT_SECRET as string, {expiresIn: "30d"})
-}
+export const loginPartner = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password } = req.body;
 
-// Login Delivery Partner 
+  if (!email || !password) {
+    return res.status(400).json({ message: "Please provide email and password" });
+  }
 
-// POST /api/delivery/login
+  const partner = await prisma.deliveryPartner.findUnique({
+    where: { email: email.toLowerCase() },
+  });
 
-export const loginPartner = async (req: Request, res: Response)=> {
+  if (!partner || !(await bcrypt.compare(password, partner.password))) {
+    return res.status(401).json({ message: "Invalid email or password" });
+  }
 
-   const { email, password } = req.body;
+  if (!partner.isActive) {
+    return res.status(403).json({ message: "Your account has been deactivated" });
+  }
 
-   if(!email || !password) {
-    return res.status(400).json({ message: " Please provide email and password"});
-   }
+  const { password: _password, ...partnerData } = partner;
 
-   const partner = await prisma.deliveryPartner.findUnique({
-    where: {email: email.toLowerCase()}
-   })
+  return res.json({ success: true, partner: partnerData, token: generateToken(partner.id) });
+});
 
-   if(!partner) {
-     return res.status(401).json({ message: " Invalid email  or password"});
+export const getMydeliveries = asyncHandler(async (req: Request, res: Response) => {
+  const { status } = req.query;
+  const where: any = { deliveryPartnerId: req.partner!.id };
 
-   }
-   if(!partner.isActive) {
-     return res.status(403).json({ message: " Your acount has been deactivated"});
-   }
+  if (status === "active") {
+    where.status = { in: ["Assigned", "Packed", "Out For Delivery", "Out for Delivery"] };
+  } else if (status === "completed") {
+    where.status = { in: ["Delivered", "Cancelled", "Returned"] };
+  }
 
-   const isMatch  = await bcrypt.compare(password, partner.password)
+  const orders = await prisma.order.findMany({
+    where,
+    include: { user: { select: { name: true, email: true, phone: true } } },
+    orderBy: { createdAt: "desc" },
+  });
 
-   if(!isMatch) {
-     return res.status(401).json({ message: " Invalid email  or password"});
+  return res.json({ success: true, orders });
+});
 
-   }
-
-
-   const token = generateToken(partner.id)
-   const {password: _, ...partnerData} = partner;
-
-   res.json({partner: partnerData, token})
-
-
-
-}
-
-// Get assigned deliveries
-
-// Get /api/delivery/my-deliveries
-
-export const getMydeliveries = async (req: Request, res: Response)=> {
-   const { status } = req.query;
-
-   const where: any = {deliveryPartnerId: req.partner!.id};
-   if(status === "active") {
-    where.status = {in: ["Assigned", "Packed", "Out for Delivery"]}
-   } else if(status === "completed") {
-    where.status = {in: ["Delivered", "Cancelled",]
-   }
-}
-
-const orders = await prisma.order.findMany({
-  where,
-  include: {user: {select: {name: true, email: true, phone: true}}},
-  orderBy: {createdAt: "desc"}
-
-})
-
-res.json({orders})
-
-
-}  
-
-// Get single delivery detail
-// GEt /api/delivery/my-deliveries/:id
-
-
-export const getDeliveryDetail = async (req: Request, res: Response)=> {
+export const getDeliveryDetail = asyncHandler(async (req: Request, res: Response) => {
+  const orderId = routeParam(req.params.id);
   const order = await prisma.order.findFirst({
-    where: {id: req.params.id as string, deliveryPartnerId: req.partner!.id},
-    include:  {user: {select: {name: true, email: true, phone: true}}}
-  })
+    where: { id: orderId, deliveryPartnerId: req.partner!.id },
+    include: { user: { select: { name: true, email: true, phone: true } } },
+  });
 
-  if(!order) {
-    return res.status(404).json({message: "Delivery not found"})
+  if (!order) {
+    return res.status(404).json({ message: "Delivery not found" });
   }
 
-  res.json({order})
-}
+  return res.json({ success: true, order });
+});
 
-// complete delivery with OTP
-// PUT /api/delivery/my-deliveries/:id/complete
-export const completeDelivery = async (req: Request, res: Response)=> {
-  const {otp} = req.body;
+export const completeDelivery = asyncHandler(async (req: Request, res: Response) => {
+  const { otp } = req.body;
+  const orderId = routeParam(req.params.id);
   const order = await prisma.order.findFirst({
-    where:  {id: req.params.id as string, deliveryPartnerId: req.partner!.id}
-  })
-  if(!order || order.status === "Cancelled" || order.status === "Delivered") {
-    return res.status(400).json({message: "Invalid Request"})
+    where: { id: orderId, deliveryPartnerId: req.partner!.id },
+  });
+
+  if (!order || ["Cancelled", "Delivered", "Returned"].includes(order.status)) {
+    return res.status(400).json({ message: "Invalid delivery request" });
   }
 
-  if(order.deliveryOtp !== otp) {
-    return res.status(500).json({message: "Invalid OTP"})
+  if (order.deliveryOtp !== otp) {
+    return res.status(400).json({ message: "Invalid OTP" });
   }
-
-  const history = order.statusHistory as any[];
-
-  history.push({status: 'Delivered', note: "Delivered by partner",
-    timestamp: new Date()
-  })
 
   const updatedOrder = await prisma.order.update({
-    where: {id: order.id },
-    data: {status: "Delivered", statusHistory: history, deliveryOtp: ""}
-  })
+    where: { id: order.id },
+    data: {
+      status: ORDER_STATUS.DELIVERED,
+      statusHistory: appendStatusHistory(order.statusHistory, ORDER_STATUS.DELIVERED, "Delivered by partner") as any,
+      deliveryOtp: "",
+      deliveredAt: new Date(),
+      ...(order.paymentMethod === "cash" ? { isPaid: true, paymentStatus: "PAID" } : {}),
+    },
+  });
 
-  res.json({order: updatedOrder, massage: "Delivery completed succesfully" })
-}
+  void sendOrderNotification(order.id, "order_delivered");
+  return res.json({ success: true, order: updatedOrder, message: "Delivery completed successfully" });
+});
 
+export const cancelDelivery = asyncHandler(async (req: Request, res: Response) => {
+  const { reason } = req.body;
+  const orderId = routeParam(req.params.id);
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, deliveryPartnerId: req.partner!.id },
+  });
 
-// Cancell delivery 
-//  PUT /api/delivery/my-deliveries/:id/cancel
-
-export const cancelDelivery = async (req: Request, res: Response)=> { 
-   const { reason } =  req.body;
-     const order = await prisma.order.findFirst({
-    where:  {id: req.params.id as string, deliveryPartnerId: req.partner!.id}
-  })
-
-  if (order!.status === "Delivered") {
-    return res.status(400).json({ message: " Cannot cancel the delivered order "})
+  if (!order) {
+    return res.status(404).json({ message: "Delivery not found" });
   }
 
-    const history = order!.statusHistory as any[];
+  if (order.status === ORDER_STATUS.DELIVERED) {
+    return res.status(400).json({ message: "Cannot cancel the delivered order" });
+  }
 
-  history.push({status: 'Cancelled', note: reason || "",
-    timestamp: new Date()
-  })
+  const updatedOrder = await cancelOrder(order.id, reason || "Cancelled by delivery partner");
+  return res.json({ success: true, order: updatedOrder, message: "Delivery cancelled" });
+});
 
-  
+export const updateDeliveryStatus = asyncHandler(async (req: Request, res: Response) => {
+  const { status } = req.body;
+  const orderId = routeParam(req.params.id);
+  const normalizedStatus = status === "Out for Delivery" ? ORDER_STATUS.OUT_FOR_DELIVERY : status;
+  const allowedStatuses = [ORDER_STATUS.PACKED, ORDER_STATUS.OUT_FOR_DELIVERY];
+
+  if (!allowedStatuses.includes(normalizedStatus)) {
+    return res.status(400).json({ message: "Invalid status update" });
+  }
+
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, deliveryPartnerId: req.partner!.id },
+  });
+
+  if (!order) {
+    return res.status(404).json({ message: "Delivery not found" });
+  }
+
   const updatedOrder = await prisma.order.update({
-    where: {id: order!.id },
-    data: {status: "Cancelled", statusHistory: history}
-  })
+    where: { id: order.id },
+    data: {
+      status: normalizedStatus,
+      statusHistory: appendStatusHistory(
+        order.statusHistory,
+        normalizedStatus,
+        `Status updated to ${normalizedStatus}`,
+      ) as any,
+      ...(normalizedStatus === ORDER_STATUS.PACKED ? { packedAt: new Date() } : {}),
+      ...(normalizedStatus === ORDER_STATUS.OUT_FOR_DELIVERY ? { outForDeliveryAt: new Date() } : {}),
+    },
+  });
 
-  res.json({order: updatedOrder, message: "Delivery cancelled"})
- }
+  if (normalizedStatus === ORDER_STATUS.OUT_FOR_DELIVERY) {
+    void sendOrderNotification(order.id, "order_shipped");
+  }
 
- // Update order status
-// PUT /api/delivery/my-deliveries/:id/status
-export const updateDeliveryStatus = async (req: Request, res: Response)=> {
-     const { status } =  req.body;
-     const allowedStatuses = ["Packed", "Out for Delivery"];
+  return res.json({ success: true, order: updatedOrder });
+});
 
-     if(!allowedStatuses.includes(status)) {
-      return res.status(400).json({ message: "Invalid status update"})
-     }
-
-     const order = await prisma.order.findFirst({
-      where: {id: req.params.id as string, deliveryPartnerId: req.partner!.id}
-     })
-     
-    const history = order!.statusHistory as any[];
-
-  history.push({status, note:`Status updated to ${status}`,
-    timestamp: new Date()
-
-  })
-
-  const updateOrder = await prisma.order.update({
-    where: {id: order!.id},
-    data: {status, statusHistory: history}
-  })
-
-  res.json({order: updateOrder})
-} 
-
-// Update Live Locaion
-// PUT /api/delivery/my-deliveries/:id/location
-
-export const updateLocation = async (req: Request, res: Response)=> {
-  const { lat, lng} = req.body;
+export const updateLocation = asyncHandler(async (req: Request, res: Response) => {
+  const { lat, lng } = req.body;
+  const orderId = routeParam(req.params.id);
   const order = await prisma.order.findFirst({
     where: {
-      id: req.params.id as string,
+      id: orderId,
       deliveryPartnerId: req.partner!.id,
-      status: {in: ['Assigned', "Packed", "Out for Delivery"]}
-    }
-  })
+      status: { in: ["Assigned", "Packed", "Out For Delivery", "Out for Delivery"] },
+    },
+  });
+
+  if (!order) {
+    return res.status(404).json({ message: "Active delivery not found" });
+  }
+
   await prisma.order.update({
-    where: {id: order!.id}, 
-    data: {liveLocation: {lat, lng, updatedAt: new Date()}}
-  })
+    where: { id: order.id },
+    data: { liveLocation: { lat: Number(lat), lng: Number(lng), updatedAt: new Date().toISOString() } },
+  });
 
-  res.json({success: true})
-}
-
-
+  return res.json({ success: true });
+});

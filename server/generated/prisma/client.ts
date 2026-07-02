@@ -66,3 +66,33 @@ export type Order = Prisma.OrderModel
  * 
  */
 export type DeliveryPartner = Prisma.DeliveryPartnerModel
+/**
+ * Model Wishlist
+ * 
+ */
+export type Wishlist = Prisma.WishlistModel
+/**
+ * Model PaymentTransaction
+ * 
+ */
+export type PaymentTransaction = Prisma.PaymentTransactionModel
+/**
+ * Model Coupon
+ * 
+ */
+export type Coupon = Prisma.CouponModel
+/**
+ * Model CouponRedemption
+ * 
+ */
+export type CouponRedemption = Prisma.CouponRedemptionModel
+/**
+ * Model WalletTransaction
+ * 
+ */
+export type WalletTransaction = Prisma.WalletTransactionModel
+/**
+ * Model Review
+ * 
+ */
+export type Review = Prisma.ReviewModel

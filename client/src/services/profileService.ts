@@ -1,7 +1,7 @@
 import api from "../config/api";
 import type { User } from "../types";
 
-export type ProfileUpdate = Pick<User, "name" | "phone" | "avatar">;
+export type ProfileUpdate = Pick<User, "name" | "phone" | "avatar" | "dob" | "gender">;
 
 export const profileService = {
   async uploadAvatar(file: File) {
@@ -22,5 +22,9 @@ export const profileService = {
 
   async changePassword(currentPassword: string, newPassword: string) {
     await api.post("/auth/change-password", { currentPassword, newPassword });
+  },
+
+  async deleteAccount() {
+    await api.delete("/auth/profile");
   },
 };

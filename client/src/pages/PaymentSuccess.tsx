@@ -8,61 +8,101 @@ import { orderService } from "../services/orderService";
 type PaymentState =
   | { status: "loading"; message: string }
   | { status: "success"; message: string; orderId: string }
-  | { status: "error"; message: string };
+  | { status: "error"; message: string; orderId?: string };
+
+const providerLabels: Record<string, string> = {
+  stripe: "card",
+  khalti: "Khalti",
+  esewa: "eSewa",
+};
 
 const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { clearCart, refreshOrders } = useAppContext();
-  const orderId = searchParams.get("orderId") ?? "";
+  const { clearCart, refreshOrder, refreshOrders } = useAppContext();
+  const provider = (searchParams.get("provider") || "stripe").toLowerCase();
+  const orderId = searchParams.get("orderId") ?? searchParams.get("purchase_order_id") ?? "";
   const sessionId = searchParams.get("session_id") ?? "";
+  const pidx = searchParams.get("pidx") ?? "";
+  const transactionUuid = searchParams.get("transaction_uuid") ?? "";
+  const dataPayload = searchParams.get("data") ?? undefined;
   const [state, setState] = useState<PaymentState>({
     status: "loading",
-    message: "Confirming your card payment...",
+    message: `Confirming your ${providerLabels[provider] ?? "online"} payment...`,
   });
 
   useEffect(() => {
     let active = true;
 
-    const timer = window.setTimeout(() => {
-      if (!orderId || !sessionId) {
-        setState({
-          status: "error",
-          message: "Payment returned without the details needed to confirm your order.",
-        });
-        return;
+    const confirmPayment = async () => {
+      if (!orderId && provider !== "esewa") {
+        throw new Error("Payment returned without an order id.");
       }
 
-      void orderService
-        .confirmStripePayment(orderId, sessionId)
-        .then((order) => {
-          if (!active) return;
-          clearCart();
-          void refreshOrders();
-          setState({
-            status: "success",
-            message: "Payment confirmed. Your order is ready to track.",
-            orderId: order.id,
-          });
+      if (provider === "stripe") {
+        if (!sessionId) throw new Error("Stripe returned without a session id.");
+        return orderService.confirmStripePayment(orderId, sessionId);
+      }
 
-          window.setTimeout(() => {
-            navigate(`/orders/${order.id}`, { replace: true });
-          }, 1200);
-        })
-        .catch((error) => {
-          if (!active) return;
-          setState({
-            status: "error",
-            message: getApiErrorMessage(error, "Could not confirm your card payment"),
-          });
+      if (provider === "khalti") {
+        if (!pidx) throw new Error("Khalti returned without a pidx.");
+        return orderService.verifyKhaltiPayment(orderId, pidx);
+      }
+
+      if (provider === "esewa") {
+        if (transactionUuid) {
+          return orderService.verifyEsewaPayment(transactionUuid, dataPayload);
+        }
+
+        if (orderId) {
+          const order = await refreshOrder(orderId);
+          if (!order) throw new Error("Could not load the eSewa order.");
+          return order;
+        }
+      }
+
+      throw new Error("Unsupported payment provider.");
+    };
+
+    void confirmPayment()
+      .then((order) => {
+        if (!active) return;
+        clearCart();
+        void refreshOrders();
+        setState({
+          status: "success",
+          message: "Payment confirmed. Your order is ready to track.",
+          orderId: order.id,
         });
-    }, 0);
+
+        window.setTimeout(() => {
+          navigate(`/orders/${order.id}`, { replace: true });
+        }, 1200);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setState({
+          status: "error",
+          message: getApiErrorMessage(error, "Could not confirm your payment"),
+          orderId,
+        });
+      });
 
     return () => {
       active = false;
-      window.clearTimeout(timer);
     };
-  }, [clearCart, navigate, orderId, refreshOrders, sessionId]);
+  }, [
+    clearCart,
+    dataPayload,
+    navigate,
+    orderId,
+    pidx,
+    provider,
+    refreshOrder,
+    refreshOrders,
+    sessionId,
+    transactionUuid,
+  ]);
 
   const isLoading = state.status === "loading";
   const isSuccess = state.status === "success";
@@ -73,7 +113,11 @@ const PaymentSuccess = () => {
       <section className="mx-auto max-w-xl rounded-lg border border-zinc-200 bg-white p-8 text-center shadow-sm">
         <div
           className={`mx-auto flex size-16 items-center justify-center rounded-full ${
-            isSuccess ? "bg-green-100 text-green-700" : state.status === "error" ? "bg-red-100 text-red-600" : "bg-green-50 text-app-green"
+            isSuccess
+              ? "bg-green-100 text-green-700"
+              : state.status === "error"
+                ? "bg-red-100 text-red-600"
+                : "bg-green-50 text-app-green"
           }`}
         >
           <Icon className={`size-8 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
@@ -94,10 +138,14 @@ const PaymentSuccess = () => {
             </Link>
           ) : (
             <Link
-              to="/checkout"
+              to={
+                state.status === "error" && state.orderId
+                  ? `/payment/failure?orderId=${state.orderId}&provider=${provider}`
+                  : "/checkout"
+              }
               className="inline-flex items-center justify-center rounded-full bg-app-green px-5 py-3 text-sm font-semibold text-white hover:bg-app-green-light focus:outline-none focus:ring-2 focus:ring-app-green focus:ring-offset-2"
             >
-              Back to checkout
+              Review payment
             </Link>
           )}
           <Link
