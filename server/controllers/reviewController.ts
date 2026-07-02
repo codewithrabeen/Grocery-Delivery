@@ -36,11 +36,13 @@ const refreshProductRating = async (productId: string) => {
   });
 };
 
+const reviewUserInclude = { user: { select: { id: true, name: true, avatar: true } } } as const;
+
 export const getProductReviews = asyncHandler(async (req: Request, res: Response) => {
   const productId = routeParam(req.params.productId);
   const reviews = await prisma.review.findMany({
     where: { productId },
-    include: { user: { select: { name: true, avatar: true } } },
+    include: reviewUserInclude,
     orderBy: { createdAt: "desc" },
   });
 
@@ -71,6 +73,7 @@ export const createReview = asyncHandler(async (req: Request, res: Response) => 
       rating,
       comment,
     },
+    include: reviewUserInclude,
   });
 
   await refreshProductRating(productId);
@@ -93,6 +96,7 @@ export const updateReview = asyncHandler(async (req: Request, res: Response) => 
       rating: req.body.rating,
       comment: req.body.comment,
     },
+    include: reviewUserInclude,
   });
 
   await refreshProductRating(review.productId);

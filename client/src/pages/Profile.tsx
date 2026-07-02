@@ -29,8 +29,10 @@ const Profile = () => {
   const [changingPassword, setChangingPassword] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [walletLoading, setWalletLoading] = useState(false);
+  const [rechargingWallet, setRechargingWallet] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletTransactions, setWalletTransactions] = useState<WalletTransaction[]>([]);
+  const [rechargeAmount, setRechargeAmount] = useState("");
   const [profileForm, setProfileForm] = useState({
     name: user?.name ?? "",
     phone: user?.phone ?? "",
@@ -130,6 +132,30 @@ const Profile = () => {
       toast.error(getApiErrorMessage(error, "Could not delete account"));
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleWalletRecharge = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const amount = Number(rechargeAmount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Enter a valid recharge amount");
+      return;
+    }
+
+    setRechargingWallet(true);
+    try {
+      const wallet = await walletService.recharge(amount, `manual-${Date.now()}`);
+      setWalletBalance(wallet.balance);
+      setWalletTransactions((current) => [...(wallet.transactions ?? []), ...current]);
+      setRechargeAmount("");
+      updateUser({ walletBalance: wallet.balance });
+      toast.success("Wallet recharged");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Could not recharge wallet"));
+    } finally {
+      setRechargingWallet(false);
     }
   };
 
@@ -301,6 +327,20 @@ const Profile = () => {
             <p className="mt-2 text-3xl font-bold text-app-green">
               {walletLoading ? "Loading" : formatPrice(walletBalance)}
             </p>
+            <form onSubmit={handleWalletRecharge} className="mt-5 flex gap-2">
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={rechargeAmount}
+                onChange={(event) => setRechargeAmount(event.target.value)}
+                placeholder="Amount"
+                className="min-w-0 flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm focus:border-app-green focus:bg-white focus:outline-none"
+              />
+              <LoadingButton type="submit" loading={rechargingWallet} className="px-4 py-0">
+                Add
+              </LoadingButton>
+            </form>
             <div className="mt-4 space-y-3">
               {walletTransactions.slice(0, 3).map((transaction) => (
                 <div key={transaction.id} className="rounded-lg border border-zinc-200 p-3">

@@ -2,6 +2,7 @@ import api from "../config/api";
 
 export type ProductReview = {
   id: string;
+  userId?: string;
   productId: string;
   orderId?: string;
   rating: number;
@@ -9,6 +10,7 @@ export type ProductReview = {
   createdAt: string;
   updatedAt?: string;
   user?: {
+    id?: string;
     name?: string;
     avatar?: string;
   };

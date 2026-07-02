@@ -15,23 +15,28 @@ export type WalletResponse = {
   transactions: WalletTransaction[];
 };
 
+type WalletApiResponse = {
+  balance?: number;
+  transactions?: WalletTransaction[];
+  transaction?: WalletTransaction;
+};
+
+const normalizeWallet = (data: WalletApiResponse): WalletResponse => ({
+  balance: Number(data.balance ?? 0),
+  transactions: data.transactions ?? (data.transaction ? [data.transaction] : []),
+});
+
 export const walletService = {
   async getWallet(): Promise<WalletResponse> {
-    const { data } = await api.get<WalletResponse>("/wallet");
-    return {
-      balance: Number(data.balance ?? 0),
-      transactions: data.transactions ?? [],
-    };
+    const { data } = await api.get<WalletApiResponse>("/wallet");
+    return normalizeWallet(data);
   },
 
   async recharge(amount: number, reference?: string): Promise<WalletResponse> {
-    const { data } = await api.post<WalletResponse>("/wallet/recharge", {
+    const { data } = await api.post<WalletApiResponse>("/wallet/recharge", {
       amount,
       reference,
     });
-    return {
-      balance: Number(data.balance ?? 0),
-      transactions: data.transactions ?? [],
-    };
+    return normalizeWallet(data);
   },
 };

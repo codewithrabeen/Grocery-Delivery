@@ -1,5 +1,6 @@
 import {
   ArrowLeftIcon,
+  Edit3Icon,
   HeartIcon,
   LeafIcon,
   MinusIcon,
@@ -7,6 +8,7 @@ import {
   ShieldCheckIcon,
   ShoppingCartIcon,
   StarIcon,
+  Trash2Icon,
   TruckIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -53,6 +55,9 @@ const ProductPage = () => {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: "" });
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+  const [remoteRelatedProducts, setRemoteRelatedProducts] = useState<Product[]>([]);
+  const [frequentlyBoughtProducts, setFrequentlyBoughtProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     if (!id || cachedProduct || productLoading) {
@@ -102,6 +107,8 @@ const ProductPage = () => {
         : [],
     [product, products],
   );
+  const recommendedRelatedProducts =
+    remoteRelatedProducts.length > 0 ? remoteRelatedProducts : relatedProducts;
   const purchasedOrder = useMemo(() => {
     if (!product) return null;
 
@@ -113,6 +120,30 @@ const ProductPage = () => {
       ) ?? null
     );
   }, [orders, product]);
+
+  useEffect(() => {
+    if (!product?.id) {
+      setRemoteRelatedProducts([]);
+      setFrequentlyBoughtProducts([]);
+      return;
+    }
+
+    let active = true;
+    void Promise.allSettled([
+      productService.getRelatedProducts(product.id),
+      productService.getFrequentlyBoughtTogether(product.id),
+    ]).then(([relatedResult, frequentlyBoughtResult]) => {
+      if (!active) return;
+      setRemoteRelatedProducts(relatedResult.status === "fulfilled" ? relatedResult.value : []);
+      setFrequentlyBoughtProducts(
+        frequentlyBoughtResult.status === "fulfilled" ? frequentlyBoughtResult.value : [],
+      );
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [product?.id]);
 
   useEffect(() => {
     if (!id) return;
@@ -127,29 +158,63 @@ const ProductPage = () => {
   const handleReviewSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!product || !purchasedOrder) {
+    if (!product) {
+      return;
+    }
+
+    if (!editingReviewId && !purchasedOrder) {
       toast.error("You can review this after purchasing it");
       return;
     }
 
     setReviewSaving(true);
     try {
-      const review = await reviewService.saveReview({
-        productId: product.id,
-        orderId: purchasedOrder.id,
-        rating: reviewForm.rating,
-        comment: reviewForm.comment,
-      });
+      const review = editingReviewId
+        ? await reviewService.updateReview(editingReviewId, {
+            rating: reviewForm.rating,
+            comment: reviewForm.comment,
+          })
+        : await reviewService.saveReview({
+            productId: product.id,
+            orderId: purchasedOrder?.id,
+            rating: reviewForm.rating,
+            comment: reviewForm.comment,
+          });
 
       if (review) {
         setReviews((current) => [review, ...current.filter((item) => item.id !== review.id)]);
       }
       setReviewForm({ rating: 5, comment: "" });
-      toast.success("Review saved");
+      setEditingReviewId(null);
+      toast.success(editingReviewId ? "Review updated" : "Review saved");
     } catch (error) {
       toast.error(getApiErrorMessage(error, "Could not save review"));
     } finally {
       setReviewSaving(false);
+    }
+  };
+
+  const handleEditReview = (review: ProductReview) => {
+    setEditingReviewId(review.id);
+    setReviewForm({
+      rating: review.rating,
+      comment: review.comment ?? "",
+    });
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!window.confirm("Delete this review?")) return;
+
+    try {
+      await reviewService.deleteReview(reviewId);
+      setReviews((current) => current.filter((review) => review.id !== reviewId));
+      if (editingReviewId === reviewId) {
+        setEditingReviewId(null);
+        setReviewForm({ rating: 5, comment: "" });
+      }
+      toast.success("Review deleted");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Could not delete review"));
     }
   };
 
@@ -336,7 +401,23 @@ const ProductPage = () => {
         </div>
       </section>
 
-      {relatedProducts.length > 0 && (
+      {frequentlyBoughtProducts.length > 0 && (
+        <section className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+          <div className="mb-6 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-app-orange">Frequently bought together</p>
+              <h2 className="mt-2 text-3xl font-bold text-zinc-950">Customers pair these</h2>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {frequentlyBoughtProducts.map((item) => (
+              <ProductCard key={item.id} product={item} showCategory />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {recommendedRelatedProducts.length > 0 && (
         <section className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
@@ -345,7 +426,7 @@ const ProductPage = () => {
             </div>
           </div>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {relatedProducts.map((item) => (
+            {recommendedRelatedProducts.map((item) => (
               <ProductCard key={item.id} product={item} showCategory />
             ))}
           </div>
@@ -363,25 +444,71 @@ const ProductPage = () => {
                 No reviews yet.
               </p>
             ) : (
-              reviews.map((review) => (
-                <article key={review.id} className="rounded-lg border border-zinc-200 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="font-semibold text-zinc-950">{review.user?.name ?? "Customer"}</p>
-                    <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-500">
-                      <StarIcon className="size-4 fill-current" aria-hidden="true" />
-                      {review.rating}
-                    </span>
-                  </div>
-                  {review.comment && <p className="mt-2 text-sm leading-6 text-zinc-600">{review.comment}</p>}
-                  <p className="mt-2 text-xs text-zinc-400">{formatDate(review.createdAt)}</p>
-                </article>
-              ))
+              reviews.map((review) => {
+                const isOwnReview = review.userId === user?.id || review.user?.id === user?.id;
+
+                return (
+                  <article key={review.id} className="rounded-lg border border-zinc-200 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-semibold text-zinc-950">
+                        {review.user?.name ?? "Customer"}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-500">
+                          <StarIcon className="size-4 fill-current" aria-hidden="true" />
+                          {review.rating}
+                        </span>
+                        {isOwnReview && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleEditReview(review)}
+                              className="flex size-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 hover:text-app-green focus:outline-none focus:ring-2 focus:ring-app-green"
+                              aria-label="Edit review"
+                            >
+                              <Edit3Icon className="size-4" aria-hidden="true" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteReview(review.id)}
+                              className="flex size-8 items-center justify-center rounded-full border border-red-100 text-red-500 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400"
+                              aria-label="Delete review"
+                            >
+                              <Trash2Icon className="size-4" aria-hidden="true" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {review.comment && (
+                      <p className="mt-2 text-sm leading-6 text-zinc-600">{review.comment}</p>
+                    )}
+                    <p className="mt-2 text-xs text-zinc-400">{formatDate(review.createdAt)}</p>
+                  </article>
+                );
+              })
             )}
           </div>
         </div>
 
         <form onSubmit={handleReviewSubmit} className="h-fit rounded-lg bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-bold text-zinc-950">Rate this product</h2>
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-xl font-bold text-zinc-950">
+              {editingReviewId ? "Edit your review" : "Rate this product"}
+            </h2>
+            {editingReviewId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingReviewId(null);
+                  setReviewForm({ rating: 5, comment: "" });
+                }}
+                className="text-sm font-semibold text-zinc-500 hover:text-zinc-950"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
           <p className="mt-2 text-sm leading-6 text-zinc-500">
             {user
               ? purchasedOrder
@@ -416,10 +543,10 @@ const ProductPage = () => {
           </label>
           <button
             type="submit"
-            disabled={!user || !purchasedOrder || reviewSaving}
+            disabled={!user || (!editingReviewId && !purchasedOrder) || reviewSaving}
             className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-app-green px-5 py-3 text-sm font-semibold text-white hover:bg-app-green-light disabled:cursor-not-allowed disabled:bg-zinc-300 focus:outline-none focus:ring-2 focus:ring-app-green focus:ring-offset-2"
           >
-            {reviewSaving ? "Saving" : "Save review"}
+            {reviewSaving ? "Saving" : editingReviewId ? "Update review" : "Save review"}
           </button>
         </form>
       </section>
