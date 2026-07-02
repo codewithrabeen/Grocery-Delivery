@@ -23,6 +23,10 @@ import { ApiError } from "./utils/api.js";
 
 const app = express();
 const port = process.env.PORT || 8000;
+const isProduction = process.env.NODE_ENV === "production";
+const rateLimitWindowMs = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000);
+const rateLimitMax = Number(process.env.RATE_LIMIT_MAX ?? (isProduction ? 300 : 5000));
+const rateLimitDisabled = process.env.RATE_LIMIT_DISABLED === "true";
 
 app.set("trust proxy", 1);
 
@@ -53,10 +57,15 @@ app.use(
 );
 app.use(
   rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: Number(process.env.RATE_LIMIT_MAX ?? 300),
+    windowMs: rateLimitWindowMs,
+    limit: rateLimitMax,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => rateLimitDisabled || (!isProduction && req.method === "GET"),
+    message: {
+      success: false,
+      message: "Too many requests, please try again shortly.",
+    },
   }),
 );
 app.use(requestLogger);
