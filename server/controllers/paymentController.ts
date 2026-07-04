@@ -9,7 +9,7 @@ import {
   verifyKhaltiPayment,
   verifyStripePayment,
 } from "../services/paymentService.js";
-import { asyncHandler, routeParam } from "../utils/api.js";
+import { ApiError, asyncHandler, routeParam } from "../utils/api.js";
 
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 
@@ -48,18 +48,26 @@ export const khaltiCallback = asyncHandler(async (req: Request, res: Response) =
   const pidx = String(req.query.pidx || "");
 
   try {
+    if (!orderId || !pidx) {
+      throw new ApiError(400, "Khalti returned without an order id or pidx");
+    }
+
     const order = await verifyKhaltiPayment(orderId, pidx);
     return redirectToClient(res, "/payment/success", {
       provider: "khalti",
       orderId: order?.id,
       pidx,
+      verified: "1",
     });
   } catch (error) {
-    await markPaymentFailed(orderId, error instanceof Error ? error.message : "Khalti payment failed", {
-      provider: "khalti",
-      pidx,
-      query: req.query,
-    });
+    if (!(error instanceof ApiError && error.statusCode === 409) && (!pidx || !orderId)) {
+      await markPaymentFailed(orderId, error instanceof Error ? error.message : "Khalti payment failed", {
+        provider: "khalti",
+        pidx,
+        query: req.query,
+      });
+    }
+
     return redirectToClient(res, "/payment/failure", {
       provider: "khalti",
       orderId,
@@ -107,6 +115,7 @@ export const esewaSuccess = asyncHandler(async (req: Request, res: Response) => 
       provider: "esewa",
       orderId: order?.id,
       transaction_uuid: transactionUuid,
+      verified: "1",
     });
   } catch (error) {
     return redirectToClient(res, "/payment/failure", {

@@ -26,6 +26,7 @@ const PaymentSuccess = () => {
   const pidx = searchParams.get("pidx") ?? "";
   const transactionUuid = searchParams.get("transaction_uuid") ?? "";
   const dataPayload = searchParams.get("data") ?? undefined;
+  const verified = ["1", "true"].includes((searchParams.get("verified") || "").toLowerCase());
   const [state, setState] = useState<PaymentState>({
     status: "loading",
     message: `Confirming your ${providerLabels[provider] ?? "online"} payment...`,
@@ -37,6 +38,12 @@ const PaymentSuccess = () => {
     const confirmPayment = async () => {
       if (!orderId && provider !== "esewa") {
         throw new Error("Payment returned without an order id.");
+      }
+
+      if (verified && orderId) {
+        const order = await refreshOrder(orderId);
+        if (!order) throw new Error("Payment was verified, but the order could not be loaded.");
+        return order;
       }
 
       if (provider === "stripe") {
@@ -102,6 +109,7 @@ const PaymentSuccess = () => {
     refreshOrders,
     sessionId,
     transactionUuid,
+    verified,
   ]);
 
   const isLoading = state.status === "loading";

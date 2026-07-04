@@ -224,6 +224,17 @@ export const markPaymentFailed = async (
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return null;
 
+  await prisma.paymentTransaction.updateMany({
+    where: {
+      orderId: order.id,
+      status: { in: ["INITIATED", "PENDING"] },
+    },
+    data: {
+      status: "FAILED",
+      failureReason: reason,
+    },
+  });
+
   const updatedOrder = await prisma.order.update({
     where: { id: order.id },
     data: {
