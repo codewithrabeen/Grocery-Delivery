@@ -83,6 +83,7 @@ const cartKey = (userId?: string | null) => userScopedKey("cart", userId);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const { user, updateUser } = useAuth();
+  const userId = user?.id ?? "";
   const [products, setProducts] = useState<Product[]>([]);
   const [productLoading, setProductLoading] = useState(true);
   const [productError, setProductError] = useState<string | null>(null);
@@ -117,7 +118,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const refreshAddresses = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setAddresses([]);
       return [];
     }
@@ -136,10 +137,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setAddressLoading(false);
     }
-  }, [updateUser, user]);
+  }, [updateUser, userId]);
 
   const refreshOrders = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setOrders([]);
       return [];
     }
@@ -157,7 +158,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setOrdersLoading(false);
     }
-  }, [user]);
+  }, [userId]);
 
   const refreshOrder = useCallback(async (id: string) => {
     try {
@@ -179,10 +180,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, [refreshProducts]);
 
   useEffect(() => {
-    const nextCart = readJsonStorage<CartQuantities>(cartKey(user?.id), {});
+    const nextCart = readJsonStorage<CartQuantities>(cartKey(userId), {});
     setCartQuantities(nextCart);
 
-    if (!user) {
+    if (!userId) {
       setAddresses([]);
       setOrders([]);
       setWishlistIds([]);
@@ -191,17 +192,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     setWishlistLoading(true);
     void wishlistService
-      .getWishlist(user.id)
+      .getWishlist(userId)
       .then(setWishlistIds)
       .finally(() => setWishlistLoading(false));
 
     void refreshAddresses();
     void refreshOrders();
-  }, [refreshAddresses, refreshOrders, user]);
+  }, [refreshAddresses, refreshOrders, userId]);
 
   useEffect(() => {
-    writeJsonStorage(cartKey(user?.id), cartQuantities);
-  }, [cartQuantities, user?.id]);
+    writeJsonStorage(cartKey(userId), cartQuantities);
+  }, [cartQuantities, userId]);
 
   const productMap = useMemo(
     () => new Map(products.filter((product) => product.id).map((product) => [product.id, product])),

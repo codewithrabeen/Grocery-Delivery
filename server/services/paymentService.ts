@@ -111,6 +111,12 @@ export const providerForPaymentMethod = (paymentMethod: string) => {
   return null;
 };
 
+export const isPaymentProviderConfigured = (provider: "stripe" | "khalti" | "esewa") => {
+  if (provider === "stripe") return Boolean(process.env.STRIPE_SECRET_KEY?.trim());
+  if (provider === "khalti") return Boolean(process.env.KHALTI_SECRET_KEY?.trim());
+  return Boolean(process.env.ESEWA_PRODUCT_CODE?.trim() && process.env.ESEWA_SECRET_KEY?.trim());
+};
+
 export const createPaymentSession = async (input: InitiatePaymentInput) => {
   const existing = await getActiveTransaction(input.order.id, input.provider);
 

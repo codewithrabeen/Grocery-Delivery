@@ -14,6 +14,10 @@ export const loginSchema = z.object({
   password: z.string().min(1).max(128),
 });
 
+export const googleLoginSchema = z.object({
+  credential: z.string().trim().min(1),
+});
+
 export const profileUpdateSchema = z.object({
   name: z.string().trim().min(2).max(120).optional(),
   phone: z.string().trim().max(30).optional(),

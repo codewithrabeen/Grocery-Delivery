@@ -9,7 +9,12 @@ import EmptyState from "../components/ui/EmptyState";
 import { getApiErrorMessage } from "../config/api";
 import { useAppContext } from "../context/AppContext";
 import { couponService } from "../services/couponService";
-import type { PaymentMethodId } from "../services/paymentService";
+import {
+  getPaymentMethods,
+  paymentMethods as defaultPaymentMethods,
+  type PaymentMethod,
+  type PaymentMethodId,
+} from "../services/paymentService";
 
 const Checkout = () => {
   const {
@@ -27,6 +32,8 @@ const Checkout = () => {
   );
   const [manualAddressId, setManualAddressId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>("cash");
+  const [availablePaymentMethods, setAvailablePaymentMethods] =
+    useState<PaymentMethod[]>(defaultPaymentMethods);
   const [deliveryWindow, setDeliveryWindow] = useState(deliveryWindows[0]);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [couponCode, setCouponCode] = useState("");
@@ -41,6 +48,29 @@ const Checkout = () => {
   useEffect(() => {
     setCouponDiscount(0);
   }, [subtotal, couponCode]);
+
+  useEffect(() => {
+    let active = true;
+
+    void getPaymentMethods()
+      .then((methods) => {
+        if (!active) return;
+        setAvailablePaymentMethods(methods);
+
+        const selected = methods.find((method) => method.id === paymentMethod);
+        if (selected && !selected.enabled) {
+          setPaymentMethod("cash");
+          toast.error(`${selected.label} is unavailable. Cash on Delivery has been selected.`);
+        }
+      })
+      .catch(() => {
+        if (active) setAvailablePaymentMethods(defaultPaymentMethods);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [paymentMethod]);
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
@@ -124,6 +154,7 @@ const Checkout = () => {
             />
             <CheckoutPayment
               deliveryWindows={deliveryWindows}
+              paymentMethods={availablePaymentMethods}
               selectedDeliveryWindow={deliveryWindow}
               selectedPaymentMethod={paymentMethod}
               onSelectDeliveryWindow={setDeliveryWindow}

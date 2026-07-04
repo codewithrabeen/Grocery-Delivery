@@ -28,6 +28,7 @@ type AuthContextType = {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   register: (name: string, email: string, password: string) => Promise<boolean>;
+  googleLogin: (credential: string) => Promise<boolean>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
 };
@@ -36,17 +37,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const readSavedToken = () => localStorage.getItem("auth_token");
 const readSavedUser = () => readJsonStorage<User | null>("auth_user", null);
+const readInitialSession = () => {
+  const savedToken = readSavedToken();
+  return {
+    token: savedToken,
+    user: savedToken ? readSavedUser() : null,
+  };
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(readSavedUser);
-  const [token, setToken] = useState<string | null>(readSavedToken);
+  const [session] = useState(readInitialSession);
+  const [user, setUser] = useState<User | null>(session.user);
+  const [token, setToken] = useState<string | null>(session.token);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const handleUnauthorized = () => {
       setUser(null);
       setToken(null);
+      removeStorage("auth_token");
+      removeStorage("auth_refresh_token");
+      removeStorage("auth_user");
     };
 
     window.addEventListener("auth:unauthorized", handleUnauthorized);
@@ -97,6 +109,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persistSession],
   );
 
+  const googleLogin = useCallback(
+    async (credential: string) => {
+      setLoading(true);
+      try {
+        const { data } = await api.post<AuthResponse>("/auth/google", { credential });
+        persistSession(data.token, data.user, data.refreshToken);
+        toast.success("Signed in with Google");
+        return true;
+      } catch (error) {
+        toast.error(getApiErrorMessage(error, "Could not sign in with Google"));
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [persistSession],
+  );
+
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
@@ -124,10 +154,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: Boolean(token && user),
       login,
       register,
+      googleLogin,
       logout,
       updateUser,
     }),
-    [loading, login, logout, register, token, updateUser, user],
+    [googleLogin, loading, login, logout, register, token, updateUser, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

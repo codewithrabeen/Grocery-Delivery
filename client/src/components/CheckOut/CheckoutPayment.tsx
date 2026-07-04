@@ -1,8 +1,9 @@
 import { ClockIcon, WalletIcon } from "lucide-react";
-import { paymentMethods, type PaymentMethodId } from "../../services/paymentService";
+import type { PaymentMethod, PaymentMethodId } from "../../services/paymentService";
 
 type CheckoutPaymentProps = {
   deliveryWindows: string[];
+  paymentMethods: PaymentMethod[];
   selectedDeliveryWindow: string;
   selectedPaymentMethod: PaymentMethodId;
   onSelectDeliveryWindow: (slot: string) => void;
@@ -11,6 +12,7 @@ type CheckoutPaymentProps = {
 
 export const CheckoutPayment = ({
   deliveryWindows,
+  paymentMethods,
   selectedDeliveryWindow,
   selectedPaymentMethod,
   onSelectDeliveryWindow,
@@ -49,6 +51,7 @@ export const CheckoutPayment = ({
             type="button"
             onClick={() => method.enabled && onSelectPaymentMethod(method.id)}
             disabled={!method.enabled}
+            title={method.enabled ? method.description : method.reason ?? method.description}
             className={`rounded-lg border px-4 py-4 text-left text-sm font-semibold ${
               selectedPaymentMethod === method.id
                 ? "border-app-green bg-green-50 text-app-green"

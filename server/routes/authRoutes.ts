@@ -4,6 +4,7 @@ import {
   deleteAccount,
   forgotPassword,
   getProfile,
+  googleLogin,
   login,
   refreshToken,
   register,
@@ -17,6 +18,7 @@ import { validateBody } from "../middleware/validate.js";
 import {
   changePasswordSchema,
   forgotPasswordSchema,
+  googleLoginSchema,
   loginSchema,
   profileUpdateSchema,
   refreshTokenSchema,
@@ -28,6 +30,7 @@ import {
 const authRouter = express.Router();
 authRouter.post("/login", validateBody(loginSchema), login);
 authRouter.post("/register", validateBody(registerSchema), register);
+authRouter.post("/google", validateBody(googleLoginSchema), googleLogin);
 authRouter.post("/refresh-token", validateBody(refreshTokenSchema), refreshToken);
 authRouter.post("/forgot-password", validateBody(forgotPasswordSchema), forgotPassword);
 authRouter.post("/reset-password", validateBody(resetPasswordSchema), resetPassword);

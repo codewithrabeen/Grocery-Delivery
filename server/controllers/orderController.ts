@@ -11,6 +11,7 @@ import {
 } from "../services/orderFulfillment.js";
 import {
   createPaymentSession,
+  isPaymentProviderConfigured,
   providerForPaymentMethod,
   verifyStripePayment,
 } from "../services/paymentService.js";
@@ -140,6 +141,15 @@ export const createOrder = asyncHandler(async (req: Request, res: Response) => {
   const normalizedPaymentMethod = normalizePaymentMethod(paymentMethod);
   const provider = providerForPaymentMethod(normalizedPaymentMethod);
   const isOnlinePayment = Boolean(provider);
+
+  if (provider && !isPaymentProviderConfigured(provider)) {
+    const label = provider === "stripe" ? "Card payment" : provider === "khalti" ? "Khalti" : "eSewa";
+    return res.status(400).json({
+      success: false,
+      message: `${label} is not available right now. Please choose Cash on Delivery or another payment method.`,
+    });
+  }
+
   const orderStatus = isOnlinePayment ? ORDER_STATUS.PAYMENT_PENDING : ORDER_STATUS.CONFIRMED;
   const paymentStatus = isOnlinePayment ? PAYMENT_STATUS.PENDING : PAYMENT_STATUS.COD_PENDING;
 

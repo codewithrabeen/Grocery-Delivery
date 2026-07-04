@@ -4,6 +4,7 @@ import {
   esewaFailure,
   esewaRedirect,
   esewaSuccess,
+  getPaymentMethods,
   getPaymentTransactions,
   khaltiCallback,
   verifyEsewa,
@@ -30,6 +31,7 @@ const esewaVerifySchema = z.object({
   data: z.string().trim().optional(),
 });
 
+paymentRouter.get("/methods", getPaymentMethods);
 paymentRouter.post("/stripe/verify", auth, validateBody(stripeVerifySchema), verifyStripe);
 paymentRouter.post("/khalti/verify", auth, validateBody(khaltiVerifySchema), verifyKhalti);
 paymentRouter.get("/khalti/callback", khaltiCallback);

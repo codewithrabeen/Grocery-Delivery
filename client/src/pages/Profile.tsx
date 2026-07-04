@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
 import LoadingButton from "../components/ui/LoadingButton";
+import PasswordInput from "../components/ui/PasswordInput";
 import { getApiErrorMessage } from "../config/api";
 import { useAppContext } from "../context/AppContext";
 import { useAuth } from "../context/AuthContext";
@@ -258,18 +259,16 @@ const Profile = () => {
           <form onSubmit={handlePasswordChange} className="rounded-lg bg-white p-6 shadow-sm">
             <h2 className="text-2xl font-bold text-zinc-950">Change password</h2>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <input
-                type="password"
+              <PasswordInput
                 required
                 value={passwordForm.currentPassword}
                 onChange={(event) =>
                   setPasswordForm({ ...passwordForm, currentPassword: event.target.value })
                 }
                 placeholder="Current password"
-                className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm focus:border-app-green focus:bg-white focus:outline-none"
+                inputClassName="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 pr-12 text-sm focus:border-app-green focus:bg-white focus:outline-none"
               />
-              <input
-                type="password"
+              <PasswordInput
                 required
                 minLength={6}
                 value={passwordForm.newPassword}
@@ -277,7 +276,7 @@ const Profile = () => {
                   setPasswordForm({ ...passwordForm, newPassword: event.target.value })
                 }
                 placeholder="New password"
-                className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm focus:border-app-green focus:bg-white focus:outline-none"
+                inputClassName="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 pr-12 text-sm focus:border-app-green focus:bg-white focus:outline-none"
               />
             </div>
             <LoadingButton type="submit" loading={changingPassword} className="mt-5">

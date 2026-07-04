@@ -1,9 +1,13 @@
+import crypto from "node:crypto";
 import bcrypt from "bcrypt";
 import { Request, Response } from "express";
+import { OAuth2Client } from "google-auth-library";
 import jwt from "jsonwebtoken";
 import sendEmail from "../config/nodemailer.js";
 import { prisma } from "../config/prisma.js";
-import { asyncHandler, normalizeEmail, sanitizeUser } from "../utils/api.js";
+import { ApiError, asyncHandler, normalizeEmail, sanitizeUser } from "../utils/api.js";
+
+const googleClient = new OAuth2Client();
 
 const generateToken = (id: string) =>
   jwt.sign({ id }, process.env.JWT_SECRET as string, {
@@ -33,6 +37,26 @@ const getUserWithAddresses = (id: string) =>
     include: { addresses: true },
   });
 
+const issueAuthResponse = async (res: Response, user: Awaited<ReturnType<typeof getUserWithAddresses>>, message: string, status = 200) => {
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  const refreshToken = generateRefreshToken(user.id);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { refreshToken },
+  });
+
+  return res.status(status).json({
+    success: true,
+    message,
+    token: generateToken(user.id),
+    refreshToken,
+    user: sanitizeUser(user),
+  });
+};
+
 export const login = asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
@@ -60,19 +84,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         })
       : user;
 
-  const refreshToken = generateRefreshToken(currentUser.id);
-  await prisma.user.update({
-    where: { id: currentUser.id },
-    data: { refreshToken },
-  });
-
-  return res.json({
-    success: true,
-    message: "Login successful",
-    token: generateToken(currentUser.id),
-    refreshToken,
-    user: sanitizeUser(currentUser),
-  });
+  return issueAuthResponse(res, currentUser, "Login successful");
 });
 
 export const register = asyncHandler(async (req: Request, res: Response) => {
@@ -96,19 +108,62 @@ export const register = asyncHandler(async (req: Request, res: Response) => {
     include: { addresses: true },
   });
 
-  const refreshToken = generateRefreshToken(user.id);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { refreshToken },
+  return issueAuthResponse(res, user, "User registered successfully", 201);
+});
+
+export const googleLogin = asyncHandler(async (req: Request, res: Response) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+
+  if (!clientId) {
+    throw new ApiError(503, "Google sign-in is not configured on this server.");
+  }
+
+  const { credential } = req.body;
+  const ticket = await googleClient.verifyIdToken({
+    idToken: credential,
+    audience: clientId,
+  });
+  const payload = ticket.getPayload();
+  const email = payload?.email ? normalizeEmail(payload.email) : "";
+
+  if (!email || !payload?.email_verified) {
+    return res.status(401).json({ message: "Google account email could not be verified" });
+  }
+
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+    include: { addresses: true },
   });
 
-  return res.status(201).json({
-    success: true,
-    message: "User registered successfully",
-    token: generateToken(user.id),
-    refreshToken,
-    user: sanitizeUser(user),
-  });
+  if (existingUser?.deletedAt) {
+    return res.status(401).json({ message: "This account has been disabled" });
+  }
+
+  const expectedRole = roleForEmail(email);
+  const user = existingUser
+    ? await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          role: expectedRole === "ADMIN" && existingUser.role !== "ADMIN" ? "ADMIN" : existingUser.role,
+          isEmailVerified: true,
+          ...(payload.picture && !existingUser.avatar ? { avatar: payload.picture } : {}),
+          ...(payload.name && !existingUser.name ? { name: payload.name } : {}),
+        },
+        include: { addresses: true },
+      })
+    : await prisma.user.create({
+        data: {
+          name: payload.name || email.split("@")[0],
+          email,
+          password: await bcrypt.hash(`google:${payload.sub}:${crypto.randomUUID()}`, 10),
+          avatar: payload.picture || "",
+          role: expectedRole,
+          isEmailVerified: true,
+        },
+        include: { addresses: true },
+      });
+
+  return issueAuthResponse(res, user, "Google sign-in successful", existingUser ? 200 : 201);
 });
 
 export const refreshToken = asyncHandler(async (req: Request, res: Response) => {

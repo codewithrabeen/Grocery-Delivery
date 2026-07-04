@@ -20,6 +20,7 @@ import { Navigate } from "react-router-dom";
 import { statusColors } from "../assets/assets";
 import ErrorState from "../components/ui/ErrorState";
 import LoadingButton from "../components/ui/LoadingButton";
+import PasswordInput from "../components/ui/PasswordInput";
 import { Skeleton } from "../components/ui/Skeleton";
 import { getApiErrorMessage } from "../config/api";
 import { useAuth } from "../context/AuthContext";
@@ -457,8 +458,7 @@ const AdminDashboard = () => {
                       placeholder="Email address"
                       className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm focus:border-app-green focus:bg-white focus:outline-none"
                     />
-                    <input
-                      type="password"
+                    <PasswordInput
                       required
                       minLength={8}
                       value={partnerForm.password}
@@ -466,7 +466,7 @@ const AdminDashboard = () => {
                         setPartnerForm({ ...partnerForm, password: event.target.value })
                       }
                       placeholder="Temporary password"
-                      className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm focus:border-app-green focus:bg-white focus:outline-none"
+                      inputClassName="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 pr-12 text-sm focus:border-app-green focus:bg-white focus:outline-none"
                     />
                     <input
                       type="tel"

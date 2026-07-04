@@ -5,6 +5,7 @@ import {
   decodeEsewaData,
   getEsewaFormPayload,
   getEsewaPaymentUrl,
+  isPaymentProviderConfigured,
   verifyEsewaPayment,
   verifyKhaltiPayment,
   verifyStripePayment,
@@ -20,6 +21,33 @@ const redirectToClient = (res: Response, path: string, params: Record<string, st
   });
   return res.redirect(url.toString());
 };
+
+export const getPaymentMethods = asyncHandler(async (_req: Request, res: Response) => {
+  return res.json({
+    success: true,
+    methods: [
+      {
+        id: "cash",
+        enabled: true,
+      },
+      {
+        id: "stripe",
+        enabled: isPaymentProviderConfigured("stripe"),
+        reason: isPaymentProviderConfigured("stripe") ? undefined : "Card payment is not configured.",
+      },
+      {
+        id: "esewa",
+        enabled: isPaymentProviderConfigured("esewa"),
+        reason: isPaymentProviderConfigured("esewa") ? undefined : "eSewa is not configured.",
+      },
+      {
+        id: "khalti",
+        enabled: isPaymentProviderConfigured("khalti"),
+        reason: isPaymentProviderConfigured("khalti") ? undefined : "Khalti is not configured on this server.",
+      },
+    ],
+  });
+});
 
 export const verifyStripe = asyncHandler(async (req: Request, res: Response) => {
   const { orderId, sessionId } = req.body;
