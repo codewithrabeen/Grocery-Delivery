@@ -8,6 +8,7 @@ import { AppProvider } from "./context/AppContext";
 import AppLayout from "./pages/AppLayout";
 import Login from "./pages/Login";
 
+
 const Home = lazy(() => import("./pages/Home"));
 const Products = lazy(() => import("./pages/Products"));
 const ProductPage = lazy(() => import("./pages/ProductPage"));
