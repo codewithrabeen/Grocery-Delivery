@@ -20,6 +20,7 @@ import walletRouter from "./routes/walletRoutes.js";
 import wishlistRouter from "./routes/wishlistRoutes.js";
 import { functions, inngest } from "./inngest/index.js";
 import { ApiError } from "./utils/api.js";
+import khaltiRoutes from "./routes/khaRoutes.js";
 
 const app = express();
 const port = process.env.PORT || 8000;
@@ -90,6 +91,7 @@ app.use("/api/inngest", serve({ client: inngest, functions }));
 app.use("/api/addresses", addressRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/delivery", deliveryPartnerRouter);
+app.use("/api/khalti", khaltiRoutes);
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err.stack || err);

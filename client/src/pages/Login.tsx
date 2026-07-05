@@ -8,6 +8,7 @@ import LoadingButton from "../components/ui/LoadingButton";
 import PasswordInput from "../components/ui/PasswordInput";
 import { useAuth } from "../context/AuthContext";
 
+
 type GoogleCredentialResponse = {
   credential?: string;
 };
@@ -49,6 +50,7 @@ const Login = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const from = (location.state as { from?: string } | null)?.from ?? "/";
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+  console.log("Google Client ID:", googleClientId);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -123,6 +125,7 @@ const Login = () => {
 
     if (!isLoginState && !trimmedName) {
       toast.error("Please enter your name");
+      console.log("Google Client ID:", googleClientId);
       return;
     }
 
