@@ -178,7 +178,7 @@ QuickBasket/
 ### Clone Repository
 
 ```bash
-git clone https://github.com/codewithrabeen/QuickBasket.git
+git clone https://github.com/codewithrabeen/Grocery-Delivery.git
 ```
 
 ### Frontend
@@ -194,7 +194,7 @@ npm run dev
 ```bash
 cd server
 npm install
-npm run dev
+npm run server
 ```
 
 ---
